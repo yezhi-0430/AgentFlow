@@ -1,0 +1,34 @@
+{
+  "dataset_id": "agentflow-fixed-v1",
+  "dataset_version": "1.0.0",
+  "frozen_at": "2026-10-24",
+  "description": "AgentFlow 固定实验任务集（v1）。仅包含发送给生成模型的任务文本；预期答案与评分要点单独存放在 expected_answers_v1.json，禁止进入模型消息。",
+  "answers_file": "expected_answers_v1.json",
+  "cases": [
+    {
+      "case_id": "case-001",
+      "task": "用一句话说明 Python 中 list 与 tuple 的核心区别，并各举一个适用场景。",
+      "tags": ["python", "basics"]
+    },
+    {
+      "case_id": "case-002",
+      "task": "计算 17 × 23，并写出最终结果和计算过程。",
+      "tags": ["math", "reasoning"]
+    },
+    {
+      "case_id": "case-003",
+      "task": "解释 HTTP 404 和 HTTP 500 状态码的区别。",
+      "tags": ["http", "knowledge"]
+    },
+    {
+      "case_id": "case-004",
+      "task": "把句子 'The quick brown fox jumps over the lazy dog' 翻译成中文。",
+      "tags": ["translation"]
+    },
+    {
+      "case_id": "case-005",
+      "task": "写一个 Python 表达式，返回列表 [3, 1, 2] 的升序排序结果，并说明是否会原地修改原列表。",
+      "tags": ["python", "coding"]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "dataset_id": "agentflow-fixed-v2",
+  "dataset_version": "2.0.0",
+  "frozen_at": "2026-10-24",
+  "description": "AgentFlow 固定实验任务集（v2，10 个 case，case-001..case-010）。文件只包含发送给生成模型的 case_id / task / tags；预期答案、评分要点与 rubric 校准信息全部单独存放在 expected_answers_v2.json，禁止拼进任何发送给生成模型的消息。",
+  "answers_file": "expected_answers_v2.json",
+  "cases": [
+    {
+      "case_id": "case-001",
+      "task": "用一句话说明 Python 中 list 与 tuple 的核心区别，并各举一个适用场景。",
+      "tags": ["python", "basics"]
+    },
+    {
+      "case_id": "case-002",
+      "task": "计算 17 × 23，并写出最终结果和计算过程。",
+      "tags": ["math", "reasoning"]
+    },
+    {
+      "case_id": "case-003",
+      "task": "解释 HTTP 404 和 HTTP 500 状态码的区别。",
+      "tags": ["http", "knowledge"]
+    },
+    {
+      "case_id": "case-004",
+      "task": "把句子 'The quick brown fox jumps over the lazy dog' 翻译成中文。",
+      "tags": ["translation"]
+    },
+    {
+      "case_id": "case-005",
+      "task": "写一个 Python 表达式，返回列表 [3, 1, 2] 的升序排序结果，并说明是否会原地修改原列表。",
+      "tags": ["python", "coding"]
+    },
+    {
+      "case_id": "case-006",
+      "task": "解释 Python 中 == 与 is 的区别，并各举一个例子。",
+      "tags": ["python", "basics"]
+    },
+    {
+      "case_id": "case-007",
+      "task": "计算 144 ÷ 12 的结果，并说明如何用乘法验证。",
+      "tags": ["math", "reasoning"]
+    },
+    {
+      "case_id": "case-008",
+      "task": "把句子 'Actions speak louder than words' 翻译成中文。",
+      "tags": ["translation"]
+    },
+    {
+      "case_id": "case-009",
+      "task": "写一个 Python 表达式，返回字符串 'AgentFlow' 反转后的结果，并说明是否会修改原字符串。",
+      "tags": ["python", "coding"]
+    },
+    {
+      "case_id": "case-010",
+      "task": "解释 HTTP 301 和 HTTP 302 重定向状态码的区别。",
+      "tags": ["http", "knowledge"]
+    }
+  ]
+}

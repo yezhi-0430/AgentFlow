@@ -1,0 +1,4473 @@
+{
+  "report_version": "2.0.0",
+  "runner_version": "2.1.0",
+  "generated_at": "2026-10-24T18:18:01+08:00",
+  "metadata": {
+    "python_version": "3.13.12",
+    "python_executable": "D:\\conda\\python.exe",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "machine": "AMD64",
+    "cwd": "C:\\Users\\LENOVO\\Documents\\Codex\\2026-10-17\\zhe\\outputs\\agentflow\\backend",
+    "project_root": "C:\\Users\\LENOVO\\Documents\\Codex\\2026-10-17\\zhe\\outputs\\agentflow",
+    "git": {
+      "commit": "08cff608ce6ed7d46284743bea7d229a20805336",
+      "branch": "main",
+      "dirty": true,
+      "dirty_count": 104
+    },
+    "empirical": true,
+    "note": "本基线所有数字来自本次实际运行；假适配器实验不代表真实模型质量/成本。"
+  },
+  "versions": {
+    "dataset": {
+      "dataset_id": "agentflow-fixed-v2",
+      "dataset_version": "2.0.0",
+      "case_count": 10
+    },
+    "config": {
+      "config_version": "1.0.0",
+      "names": [
+        "single",
+        "sequential",
+        "parallel"
+      ]
+    },
+    "scorer": {
+      "id": "deterministic-rubric-v2",
+      "version": "2.0.0",
+      "method": "deterministic-rubric-v2",
+      "pass_threshold_default": 0.75,
+      "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+      "pass_rule": "score >= pass_threshold 且所有 critical 条目命中",
+      "calibration": {
+        "pass_threshold_default": 0.75,
+        "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+        "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+        "bands": [
+          {
+            "range": "1.0",
+            "meaning": "全部评分点命中，通过"
+          },
+          {
+            "range": "0.75-0.999",
+            "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+          },
+          {
+            "range": "0.5-0.749",
+            "meaning": "部分正确但未达阈值，不通过"
+          },
+          {
+            "range": "0.0-0.499",
+            "meaning": "基本错误或答非所问，不通过"
+          }
+        ],
+        "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+        "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+      }
+    },
+    "judge": {
+      "mode": "deterministic",
+      "adapter": "deterministic-rubric-v2",
+      "model": null,
+      "network": false,
+      "deterministic": true,
+      "version": "2.0.0",
+      "pass_threshold_default": 0.75,
+      "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+    }
+  },
+  "mechanism_verification": {
+    "pytest": {
+      "command": "D:\\conda\\python.exe -m pytest tests/ -q",
+      "cwd": "C:\\Users\\LENOVO\\Documents\\Codex\\2026-10-17\\zhe\\outputs\\agentflow\\backend",
+      "exit_code": 0,
+      "passed": 196,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration_seconds": 19.09,
+      "summary_line": "196 passed in 19.09s",
+      "output_tail": "........................................................................ [ 36%]\n........................................................................ [ 73%]\n....................................................                     [100%]\n196 passed in 19.09s",
+      "timeout": false,
+      "started_at": "2026-10-24T18:18:01+08:00"
+    },
+    "checks": [
+      {
+        "check": "数据集可加载且版本字段完整",
+        "passed": true,
+        "details": {
+          "dataset_id": "agentflow-fixed-v2",
+          "dataset_version": "2.0.0",
+          "case_count": 10
+        }
+      },
+      {
+        "check": "至少 10 个固定 case 且 case_id 唯一",
+        "passed": true,
+        "details": {
+          "case_count": 10,
+          "unique": 10,
+          "min_expected": 10,
+          "case_ids": [
+            "case-001",
+            "case-002",
+            "case-003",
+            "case-004",
+            "case-005",
+            "case-006",
+            "case-007",
+            "case-008",
+            "case-009",
+            "case-010"
+          ]
+        }
+      },
+      {
+        "check": "数据集不含预期答案/评分字段（答案隔离）",
+        "passed": true,
+        "details": {
+          "leaked_fields": [],
+          "forbidden_keys": [
+            "answer",
+            "answers",
+            "expected",
+            "expected_answer",
+            "labels",
+            "reference_answer",
+            "rubric",
+            "scoring"
+          ]
+        }
+      },
+      {
+        "check": "预期答案覆盖全部固定 case 且评分器版本一致",
+        "passed": true,
+        "details": {
+          "answers_present": true,
+          "scorer_version": "2.0.0",
+          "answer_case_count": 10,
+          "missing_case_ids": [],
+          "unused_case_ids": []
+        }
+      },
+      {
+        "check": "三种配置（single/sequential/parallel）定义齐全",
+        "passed": true,
+        "details": {
+          "config_version": "1.0.0",
+          "configs": [
+            "parallel",
+            "sequential",
+            "single"
+          ],
+          "missing": [],
+          "unexpected": []
+        }
+      },
+      {
+        "check": "实验配置只使用引擎支持的 sequential/parallel 模式",
+        "passed": true,
+        "details": {
+          "engine_patterns": {
+            "single": "sequential",
+            "sequential": "sequential",
+            "parallel": "parallel"
+          },
+          "note": "single 是实验层名称，底层为 1 步 sequential；未支持模式不会进入实验配置。"
+        }
+      },
+      {
+        "check": "引擎冒烟：single 配置可执行、有输出且可评分",
+        "passed": true,
+        "details": {
+          "case_id": "case-001",
+          "status": "completed",
+          "output_chars": 41,
+          "score": 1.0,
+          "elapsed_seconds": 0.0791,
+          "total_tokens": 33,
+          "adapter": "scripted-fake-v1"
+        }
+      },
+      {
+        "check": "假适配器确定性：同一输入两次运行输出/token/评分一致",
+        "passed": true,
+        "details": {
+          "output_equal": true,
+          "tokens": [
+            33,
+            33
+          ],
+          "scores": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      {
+        "check": "运行器默认不启用真实模型（mode=fake、network=false）",
+        "passed": true,
+        "details": {
+          "mode": "fake",
+          "network": false,
+          "real_gate_env": "AGENTFLOW_EXPERIMENT_REAL",
+          "real_gate_set": false
+        }
+      },
+      {
+        "check": "运行记录满足版本化契约（schema_version/run_id/trace_id/attempts/error_type/用量类型）",
+        "passed": true,
+        "details": {
+          "backend_record_schema_version": 4,
+          "record_schema_version": 4,
+          "run_id_present": true,
+          "trace_id": null,
+          "tracing_enabled": false,
+          "step_fields": [
+            "agent_name",
+            "attempts",
+            "duration_seconds",
+            "error",
+            "error_type",
+            "finish_reason",
+            "input_chars",
+            "model",
+            "output_excerpt",
+            "status",
+            "step_id",
+            "step_index",
+            "total_tokens",
+            "usage_type",
+            "usage_unknown"
+          ],
+          "step_usage_type": "actual",
+          "attempts": 1,
+          "error_type": null
+        }
+      },
+      {
+        "check": "引擎拒绝未支持的工作流模式（如 debate）",
+        "passed": true,
+        "details": {
+          "checked_pattern": "debate",
+          "rejected": true
+        }
+      }
+    ],
+    "checks_passed": 11,
+    "checks_total": 11,
+    "smoke": {
+      "runs": [
+        {
+          "experiment_id": "harness2-92c0ce150921",
+          "created_at": "2026-10-24T18:18:22+08:00",
+          "runner": {
+            "name": "run_experiment.py",
+            "version": "2.1.0"
+          },
+          "adapter": {
+            "mode": "fake",
+            "adapter_id": "scripted-fake-v1",
+            "network": false,
+            "deterministic": true,
+            "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+            "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+          },
+          "judge": {
+            "mode": "deterministic",
+            "adapter": "deterministic-rubric-v2",
+            "model": null,
+            "network": false,
+            "deterministic": true,
+            "version": "2.0.0",
+            "pass_threshold_default": 0.75,
+            "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+          },
+          "tracing": {
+            "enabled": false,
+            "provider": "langfuse",
+            "note": "追踪显式开启时，case.trace_id 从 run 记录 / execute() 返回值读取；未配置 Langfuse 或未启用追踪时 trace_id=null，不会伪造。"
+          },
+          "dataset": {
+            "path": "experiments/dataset_v2.json",
+            "dataset_id": "agentflow-fixed-v2",
+            "dataset_version": "2.0.0",
+            "full_case_count": 10,
+            "case_count": 1,
+            "case_ids": [
+              "case-001"
+            ],
+            "limit": 1,
+            "answers": {
+              "path": "experiments/expected_answers_v2.json",
+              "present": true,
+              "scorer_version": "2.0.0",
+              "answer_case_count": 10,
+              "missing_case_ids": [],
+              "unused_case_ids": [],
+              "calibration": {
+                "pass_threshold_default": 0.75,
+                "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+                "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+                "bands": [
+                  {
+                    "range": "1.0",
+                    "meaning": "全部评分点命中，通过"
+                  },
+                  {
+                    "range": "0.75-0.999",
+                    "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+                  },
+                  {
+                    "range": "0.5-0.749",
+                    "meaning": "部分正确但未达阈值，不通过"
+                  },
+                  {
+                    "range": "0.0-0.499",
+                    "meaning": "基本错误或答非所问，不通过"
+                  }
+                ],
+                "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+                "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+              },
+              "error": null
+            }
+          },
+          "configs": {
+            "path": "experiments/configs_v1.json",
+            "config_version": "1.0.0",
+            "names": [
+              "single"
+            ]
+          },
+          "scorer": {
+            "id": "deterministic-rubric-v2",
+            "version": "2.0.0",
+            "method": "deterministic-rubric-v2",
+            "pass_threshold_default": 0.75,
+            "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+            "pass_rule": "score >= pass_threshold 且所有 critical 条目命中",
+            "calibration": {
+              "pass_threshold_default": 0.75,
+              "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+              "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+              "bands": [
+                {
+                  "range": "1.0",
+                  "meaning": "全部评分点命中，通过"
+                },
+                {
+                  "range": "0.75-0.999",
+                  "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+                },
+                {
+                  "range": "0.5-0.749",
+                  "meaning": "部分正确但未达阈值，不通过"
+                },
+                {
+                  "range": "0.0-0.499",
+                  "meaning": "基本错误或答非所问，不通过"
+                }
+              ],
+              "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+              "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+            }
+          },
+          "harness2": {
+            "experiment_id": "harness2-92c0ce150921",
+            "experiment_name": "Harness²-lite fake 候选对比 2026-10-24T18:18:21+08:00",
+            "persisted": true,
+            "db_error": null,
+            "candidates": [
+              {
+                "config_name": "single",
+                "candidate_id": "harness2-92c0ce150921-single",
+                "name": "single",
+                "fingerprint": "3141640de8c5b3ae"
+              }
+            ],
+            "judge": {
+              "mode": "deterministic",
+              "independent_judge_enabled": false,
+              "budget": {
+                "max_calls": 50,
+                "used": 0,
+                "remaining": 50
+              }
+            },
+            "evidence": {
+              "enabled": false,
+              "directory_env": "AGENTFLOW_EVIDENCE_DIR",
+              "retention_days": 90,
+              "written_count": 0,
+              "pruned_count": 0,
+              "prune_error": null
+            }
+          },
+          "experiments": [
+            {
+              "config_name": "single",
+              "candidate_id": "harness2-92c0ce150921-single",
+              "candidate_name": "single",
+              "fingerprint": "3141640de8c5b3ae",
+              "config_version": "1.0.0",
+              "pattern": "single",
+              "engine_pattern": "sequential",
+              "description": "单 Agent 单步直接作答（实验层 single；底层为 1 步 sequential 引擎模式）",
+              "model": "fake-scripted-v1",
+              "steps": [
+                {
+                  "step_id": "answer",
+                  "agent_name": "solver"
+                }
+              ],
+              "adapter": {
+                "mode": "fake",
+                "adapter_id": "scripted-fake-v1",
+                "network": false,
+                "deterministic": true,
+                "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+                "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+              },
+              "judge": {
+                "mode": "deterministic",
+                "adapter": "deterministic-rubric-v2",
+                "model": null,
+                "network": false,
+                "deterministic": true,
+                "version": "2.0.0",
+                "pass_threshold_default": 0.75,
+                "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+              },
+              "tracing": {
+                "enabled": false
+              },
+              "metrics": {
+                "case_count": 1,
+                "status_counts": {
+                  "completed": 1
+                },
+                "execution": {
+                  "completed_count": 1,
+                  "partial_count": 0,
+                  "failed_count": 0,
+                  "execution_success_rate": 1.0,
+                  "failed_case_ids": [],
+                  "partial_case_ids": [],
+                  "trace_id_present_count": 0,
+                  "trace_id_case_ids": []
+                },
+                "timing": {
+                  "total_seconds": 0.0791,
+                  "mean_seconds": 0.0791,
+                  "median_seconds": 0.0791,
+                  "max_seconds": 0.0791
+                },
+                "tokens": {
+                  "total": 33,
+                  "mean_per_case": 33.0,
+                  "usage_type_counts": {
+                    "actual": 1
+                  },
+                  "unknown_usage_step_count": 0,
+                  "unknown_usage_case_ids": []
+                },
+                "quality": {
+                  "scored_count": 1,
+                  "unscored_count": 0,
+                  "passed_count": 1,
+                  "missing_score_count": 0,
+                  "scoring_error_count": 0,
+                  "judge_disabled_count": 0,
+                  "score_status_counts": {
+                    "scored": 1
+                  },
+                  "pass_rate_scored": 1.0,
+                  "pass_rate_all_cases": 1.0,
+                  "mean_score_scored": 1.0,
+                  "mean_score_all_cases": 1.0,
+                  "passed_case_ids": [
+                    "case-001"
+                  ],
+                  "scored_case_ids": [
+                    "case-001"
+                  ],
+                  "unscored_case_ids": [],
+                  "missing_score_case_ids": [],
+                  "scoring_error_case_ids": [],
+                  "judge_disabled_case_ids": [],
+                  "critical_missed_case_ids": []
+                },
+                "harness2": {
+                  "judge_status_counts": {},
+                  "judge_scored_count": 0,
+                  "judge_failure_count": 0,
+                  "judge_agreement_count": 0,
+                  "judge_disagreement_count": 0,
+                  "evidence_ref_count": 0,
+                  "evidence_error_count": 0,
+                  "persistence_error_count": 0
+                }
+              },
+              "cases": [
+                {
+                  "case_id": "case-001",
+                  "config": "single",
+                  "experiment_id": "harness2-92c0ce150921",
+                  "candidate_id": "harness2-92c0ce150921-single",
+                  "fingerprint": "3141640de8c5b3ae",
+                  "status": "completed",
+                  "workflow_status": "completed",
+                  "workflow_name": "experiment-single",
+                  "record_schema_version": 4,
+                  "workflow_error": null,
+                  "stop_requested": false,
+                  "failure_reason": null,
+                  "error": null,
+                  "run_id": "3588d8b9-f49e-4655-baea-fc82af81bc8e",
+                  "trace_id": null,
+                  "trace_id_source": null,
+                  "tracing_enabled": false,
+                  "elapsed_seconds": 0.0791,
+                  "workflow_duration_seconds": 0.0003,
+                  "total_tokens": 33,
+                  "unknown_usage_step_count": 0,
+                  "usage_type": "actual",
+                  "output": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。",
+                  "output_source": "final_result",
+                  "step_results": [
+                    {
+                      "step_id": "answer",
+                      "step_index": 0,
+                      "agent_name": "solver",
+                      "status": "completed",
+                      "attempts": 1,
+                      "error_type": null,
+                      "model": "fake-scripted-v1",
+                      "finish_reason": "stop",
+                      "duration_seconds": 0.0003,
+                      "total_tokens": 33,
+                      "usage_type": "actual",
+                      "usage_unknown": false,
+                      "error": null,
+                      "input_chars": 45,
+                      "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                    }
+                  ],
+                  "score": {
+                    "method": "deterministic-rubric-v2",
+                    "score": 1.0,
+                    "passed": true,
+                    "passed_score_only": true,
+                    "pass_threshold": 0.75,
+                    "matched_items": [
+                      "r1",
+                      "r2",
+                      "r3"
+                    ],
+                    "missed_items": [],
+                    "critical_items": [
+                      "r1",
+                      "r2"
+                    ],
+                    "critical_missed_items": [],
+                    "rubric_item_count": 3,
+                    "weight_total": 3.0,
+                    "weight_matched": 3.0,
+                    "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                    "scorer_version": "2.0.0",
+                    "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                    "judge_mode": "deterministic",
+                    "judge_adapter": "deterministic-rubric-v2",
+                    "judge_model": null,
+                    "judge_network": false
+                  },
+                  "score_status": "scored",
+                  "score_source": "deterministic",
+                  "scoring_error": null,
+                  "scoring_error_type": null,
+                  "missing_score": false,
+                  "score_note": null,
+                  "independent_judge": null,
+                  "judge_status": null,
+                  "evidence_ref": null,
+                  "evidence_error": null,
+                  "persistence_error": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "harness2-3c3091d0d332",
+          "created_at": "2026-10-24T18:18:22+08:00",
+          "runner": {
+            "name": "run_experiment.py",
+            "version": "2.1.0"
+          },
+          "adapter": {
+            "mode": "fake",
+            "adapter_id": "scripted-fake-v1",
+            "network": false,
+            "deterministic": true,
+            "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+            "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+          },
+          "judge": {
+            "mode": "deterministic",
+            "adapter": "deterministic-rubric-v2",
+            "model": null,
+            "network": false,
+            "deterministic": true,
+            "version": "2.0.0",
+            "pass_threshold_default": 0.75,
+            "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+          },
+          "tracing": {
+            "enabled": false,
+            "provider": "langfuse",
+            "note": "追踪显式开启时，case.trace_id 从 run 记录 / execute() 返回值读取；未配置 Langfuse 或未启用追踪时 trace_id=null，不会伪造。"
+          },
+          "dataset": {
+            "path": "experiments/dataset_v2.json",
+            "dataset_id": "agentflow-fixed-v2",
+            "dataset_version": "2.0.0",
+            "full_case_count": 10,
+            "case_count": 1,
+            "case_ids": [
+              "case-001"
+            ],
+            "limit": 1,
+            "answers": {
+              "path": "experiments/expected_answers_v2.json",
+              "present": true,
+              "scorer_version": "2.0.0",
+              "answer_case_count": 10,
+              "missing_case_ids": [],
+              "unused_case_ids": [],
+              "calibration": {
+                "pass_threshold_default": 0.75,
+                "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+                "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+                "bands": [
+                  {
+                    "range": "1.0",
+                    "meaning": "全部评分点命中，通过"
+                  },
+                  {
+                    "range": "0.75-0.999",
+                    "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+                  },
+                  {
+                    "range": "0.5-0.749",
+                    "meaning": "部分正确但未达阈值，不通过"
+                  },
+                  {
+                    "range": "0.0-0.499",
+                    "meaning": "基本错误或答非所问，不通过"
+                  }
+                ],
+                "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+                "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+              },
+              "error": null
+            }
+          },
+          "configs": {
+            "path": "experiments/configs_v1.json",
+            "config_version": "1.0.0",
+            "names": [
+              "single"
+            ]
+          },
+          "scorer": {
+            "id": "deterministic-rubric-v2",
+            "version": "2.0.0",
+            "method": "deterministic-rubric-v2",
+            "pass_threshold_default": 0.75,
+            "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+            "pass_rule": "score >= pass_threshold 且所有 critical 条目命中",
+            "calibration": {
+              "pass_threshold_default": 0.75,
+              "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+              "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+              "bands": [
+                {
+                  "range": "1.0",
+                  "meaning": "全部评分点命中，通过"
+                },
+                {
+                  "range": "0.75-0.999",
+                  "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+                },
+                {
+                  "range": "0.5-0.749",
+                  "meaning": "部分正确但未达阈值，不通过"
+                },
+                {
+                  "range": "0.0-0.499",
+                  "meaning": "基本错误或答非所问，不通过"
+                }
+              ],
+              "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+              "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+            }
+          },
+          "harness2": {
+            "experiment_id": "harness2-3c3091d0d332",
+            "experiment_name": "Harness²-lite fake 候选对比 2026-10-24T18:18:22+08:00",
+            "persisted": true,
+            "db_error": null,
+            "candidates": [
+              {
+                "config_name": "single",
+                "candidate_id": "harness2-3c3091d0d332-single",
+                "name": "single",
+                "fingerprint": "3141640de8c5b3ae"
+              }
+            ],
+            "judge": {
+              "mode": "deterministic",
+              "independent_judge_enabled": false,
+              "budget": {
+                "max_calls": 50,
+                "used": 0,
+                "remaining": 50
+              }
+            },
+            "evidence": {
+              "enabled": false,
+              "directory_env": "AGENTFLOW_EVIDENCE_DIR",
+              "retention_days": 90,
+              "written_count": 0,
+              "pruned_count": 0,
+              "prune_error": null
+            }
+          },
+          "experiments": [
+            {
+              "config_name": "single",
+              "candidate_id": "harness2-3c3091d0d332-single",
+              "candidate_name": "single",
+              "fingerprint": "3141640de8c5b3ae",
+              "config_version": "1.0.0",
+              "pattern": "single",
+              "engine_pattern": "sequential",
+              "description": "单 Agent 单步直接作答（实验层 single；底层为 1 步 sequential 引擎模式）",
+              "model": "fake-scripted-v1",
+              "steps": [
+                {
+                  "step_id": "answer",
+                  "agent_name": "solver"
+                }
+              ],
+              "adapter": {
+                "mode": "fake",
+                "adapter_id": "scripted-fake-v1",
+                "network": false,
+                "deterministic": true,
+                "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+                "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+              },
+              "judge": {
+                "mode": "deterministic",
+                "adapter": "deterministic-rubric-v2",
+                "model": null,
+                "network": false,
+                "deterministic": true,
+                "version": "2.0.0",
+                "pass_threshold_default": 0.75,
+                "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+              },
+              "tracing": {
+                "enabled": false
+              },
+              "metrics": {
+                "case_count": 1,
+                "status_counts": {
+                  "completed": 1
+                },
+                "execution": {
+                  "completed_count": 1,
+                  "partial_count": 0,
+                  "failed_count": 0,
+                  "execution_success_rate": 1.0,
+                  "failed_case_ids": [],
+                  "partial_case_ids": [],
+                  "trace_id_present_count": 0,
+                  "trace_id_case_ids": []
+                },
+                "timing": {
+                  "total_seconds": 0.0525,
+                  "mean_seconds": 0.0525,
+                  "median_seconds": 0.0525,
+                  "max_seconds": 0.0525
+                },
+                "tokens": {
+                  "total": 33,
+                  "mean_per_case": 33.0,
+                  "usage_type_counts": {
+                    "actual": 1
+                  },
+                  "unknown_usage_step_count": 0,
+                  "unknown_usage_case_ids": []
+                },
+                "quality": {
+                  "scored_count": 1,
+                  "unscored_count": 0,
+                  "passed_count": 1,
+                  "missing_score_count": 0,
+                  "scoring_error_count": 0,
+                  "judge_disabled_count": 0,
+                  "score_status_counts": {
+                    "scored": 1
+                  },
+                  "pass_rate_scored": 1.0,
+                  "pass_rate_all_cases": 1.0,
+                  "mean_score_scored": 1.0,
+                  "mean_score_all_cases": 1.0,
+                  "passed_case_ids": [
+                    "case-001"
+                  ],
+                  "scored_case_ids": [
+                    "case-001"
+                  ],
+                  "unscored_case_ids": [],
+                  "missing_score_case_ids": [],
+                  "scoring_error_case_ids": [],
+                  "judge_disabled_case_ids": [],
+                  "critical_missed_case_ids": []
+                },
+                "harness2": {
+                  "judge_status_counts": {},
+                  "judge_scored_count": 0,
+                  "judge_failure_count": 0,
+                  "judge_agreement_count": 0,
+                  "judge_disagreement_count": 0,
+                  "evidence_ref_count": 0,
+                  "evidence_error_count": 0,
+                  "persistence_error_count": 0
+                }
+              },
+              "cases": [
+                {
+                  "case_id": "case-001",
+                  "config": "single",
+                  "experiment_id": "harness2-3c3091d0d332",
+                  "candidate_id": "harness2-3c3091d0d332-single",
+                  "fingerprint": "3141640de8c5b3ae",
+                  "status": "completed",
+                  "workflow_status": "completed",
+                  "workflow_name": "experiment-single",
+                  "record_schema_version": 4,
+                  "workflow_error": null,
+                  "stop_requested": false,
+                  "failure_reason": null,
+                  "error": null,
+                  "run_id": "d2c6be3b-bcbc-460b-920f-7a2a6a2555ca",
+                  "trace_id": null,
+                  "trace_id_source": null,
+                  "tracing_enabled": false,
+                  "elapsed_seconds": 0.0525,
+                  "workflow_duration_seconds": 0.0001,
+                  "total_tokens": 33,
+                  "unknown_usage_step_count": 0,
+                  "usage_type": "actual",
+                  "output": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。",
+                  "output_source": "final_result",
+                  "step_results": [
+                    {
+                      "step_id": "answer",
+                      "step_index": 0,
+                      "agent_name": "solver",
+                      "status": "completed",
+                      "attempts": 1,
+                      "error_type": null,
+                      "model": "fake-scripted-v1",
+                      "finish_reason": "stop",
+                      "duration_seconds": 0.0001,
+                      "total_tokens": 33,
+                      "usage_type": "actual",
+                      "usage_unknown": false,
+                      "error": null,
+                      "input_chars": 45,
+                      "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                    }
+                  ],
+                  "score": {
+                    "method": "deterministic-rubric-v2",
+                    "score": 1.0,
+                    "passed": true,
+                    "passed_score_only": true,
+                    "pass_threshold": 0.75,
+                    "matched_items": [
+                      "r1",
+                      "r2",
+                      "r3"
+                    ],
+                    "missed_items": [],
+                    "critical_items": [
+                      "r1",
+                      "r2"
+                    ],
+                    "critical_missed_items": [],
+                    "rubric_item_count": 3,
+                    "weight_total": 3.0,
+                    "weight_matched": 3.0,
+                    "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                    "scorer_version": "2.0.0",
+                    "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                    "judge_mode": "deterministic",
+                    "judge_adapter": "deterministic-rubric-v2",
+                    "judge_model": null,
+                    "judge_network": false
+                  },
+                  "score_status": "scored",
+                  "score_source": "deterministic",
+                  "scoring_error": null,
+                  "scoring_error_type": null,
+                  "missing_score": false,
+                  "score_note": null,
+                  "independent_judge": null,
+                  "judge_status": null,
+                  "evidence_ref": null,
+                  "evidence_error": null,
+                  "persistence_error": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "deterministic": true
+    }
+  },
+  "fake_model_experiment": {
+    "note": "仅证明机制，不代表真实模型质量/成本；假适配器不联网、不调用付费模型。",
+    "adapter_note": "scripted-fake-v1 的输出为预先编写的确定性文本，token 为规则生成的合成值。",
+    "experiment": {
+      "experiment_id": "harness2-f7fbb51bd69b",
+      "created_at": "2026-10-24T18:18:24+08:00",
+      "runner": {
+        "name": "run_experiment.py",
+        "version": "2.1.0"
+      },
+      "adapter": {
+        "mode": "fake",
+        "adapter_id": "scripted-fake-v1",
+        "network": false,
+        "deterministic": true,
+        "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+        "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+      },
+      "judge": {
+        "mode": "deterministic",
+        "adapter": "deterministic-rubric-v2",
+        "model": null,
+        "network": false,
+        "deterministic": true,
+        "version": "2.0.0",
+        "pass_threshold_default": 0.75,
+        "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+      },
+      "tracing": {
+        "enabled": false,
+        "provider": "langfuse",
+        "note": "追踪显式开启时，case.trace_id 从 run 记录 / execute() 返回值读取；未配置 Langfuse 或未启用追踪时 trace_id=null，不会伪造。"
+      },
+      "dataset": {
+        "path": "experiments/dataset_v2.json",
+        "dataset_id": "agentflow-fixed-v2",
+        "dataset_version": "2.0.0",
+        "full_case_count": 10,
+        "case_count": 10,
+        "case_ids": [
+          "case-001",
+          "case-002",
+          "case-003",
+          "case-004",
+          "case-005",
+          "case-006",
+          "case-007",
+          "case-008",
+          "case-009",
+          "case-010"
+        ],
+        "limit": null,
+        "answers": {
+          "path": "experiments/expected_answers_v2.json",
+          "present": true,
+          "scorer_version": "2.0.0",
+          "answer_case_count": 10,
+          "missing_case_ids": [],
+          "unused_case_ids": [],
+          "calibration": {
+            "pass_threshold_default": 0.75,
+            "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+            "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+            "bands": [
+              {
+                "range": "1.0",
+                "meaning": "全部评分点命中，通过"
+              },
+              {
+                "range": "0.75-0.999",
+                "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+              },
+              {
+                "range": "0.5-0.749",
+                "meaning": "部分正确但未达阈值，不通过"
+              },
+              {
+                "range": "0.0-0.499",
+                "meaning": "基本错误或答非所问，不通过"
+              }
+            ],
+            "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+            "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+          },
+          "error": null
+        }
+      },
+      "configs": {
+        "path": "experiments/configs_v1.json",
+        "config_version": "1.0.0",
+        "names": [
+          "single",
+          "sequential",
+          "parallel"
+        ]
+      },
+      "scorer": {
+        "id": "deterministic-rubric-v2",
+        "version": "2.0.0",
+        "method": "deterministic-rubric-v2",
+        "pass_threshold_default": 0.75,
+        "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+        "pass_rule": "score >= pass_threshold 且所有 critical 条目命中",
+        "calibration": {
+          "pass_threshold_default": 0.75,
+          "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+          "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+          "bands": [
+            {
+              "range": "1.0",
+              "meaning": "全部评分点命中，通过"
+            },
+            {
+              "range": "0.75-0.999",
+              "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+            },
+            {
+              "range": "0.5-0.749",
+              "meaning": "部分正确但未达阈值，不通过"
+            },
+            {
+              "range": "0.0-0.499",
+              "meaning": "基本错误或答非所问，不通过"
+            }
+          ],
+          "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+          "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+        }
+      },
+      "harness2": {
+        "experiment_id": "harness2-f7fbb51bd69b",
+        "experiment_name": "Harness²-lite fake 候选对比 2026-10-24T18:18:22+08:00",
+        "persisted": true,
+        "db_error": null,
+        "candidates": [
+          {
+            "config_name": "single",
+            "candidate_id": "harness2-f7fbb51bd69b-single",
+            "name": "single",
+            "fingerprint": "3141640de8c5b3ae"
+          },
+          {
+            "config_name": "sequential",
+            "candidate_id": "harness2-f7fbb51bd69b-sequential",
+            "name": "sequential",
+            "fingerprint": "e58ce8dbbeac385c"
+          },
+          {
+            "config_name": "parallel",
+            "candidate_id": "harness2-f7fbb51bd69b-parallel",
+            "name": "parallel",
+            "fingerprint": "07296a8c12c7533a"
+          }
+        ],
+        "judge": {
+          "mode": "deterministic",
+          "independent_judge_enabled": false,
+          "budget": {
+            "max_calls": 50,
+            "used": 0,
+            "remaining": 50
+          }
+        },
+        "evidence": {
+          "enabled": false,
+          "directory_env": "AGENTFLOW_EVIDENCE_DIR",
+          "retention_days": 90,
+          "written_count": 0,
+          "pruned_count": 0,
+          "prune_error": null
+        }
+      },
+      "experiments": [
+        {
+          "config_name": "single",
+          "candidate_id": "harness2-f7fbb51bd69b-single",
+          "candidate_name": "single",
+          "fingerprint": "3141640de8c5b3ae",
+          "config_version": "1.0.0",
+          "pattern": "single",
+          "engine_pattern": "sequential",
+          "description": "单 Agent 单步直接作答（实验层 single；底层为 1 步 sequential 引擎模式）",
+          "model": "fake-scripted-v1",
+          "steps": [
+            {
+              "step_id": "answer",
+              "agent_name": "solver"
+            }
+          ],
+          "adapter": {
+            "mode": "fake",
+            "adapter_id": "scripted-fake-v1",
+            "network": false,
+            "deterministic": true,
+            "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+            "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+          },
+          "judge": {
+            "mode": "deterministic",
+            "adapter": "deterministic-rubric-v2",
+            "model": null,
+            "network": false,
+            "deterministic": true,
+            "version": "2.0.0",
+            "pass_threshold_default": 0.75,
+            "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+          },
+          "tracing": {
+            "enabled": false
+          },
+          "metrics": {
+            "case_count": 10,
+            "status_counts": {
+              "completed": 10
+            },
+            "execution": {
+              "completed_count": 10,
+              "partial_count": 0,
+              "failed_count": 0,
+              "execution_success_rate": 1.0,
+              "failed_case_ids": [],
+              "partial_case_ids": [],
+              "trace_id_present_count": 0,
+              "trace_id_case_ids": []
+            },
+            "timing": {
+              "total_seconds": 0.5678,
+              "mean_seconds": 0.0568,
+              "median_seconds": 0.056,
+              "max_seconds": 0.0709
+            },
+            "tokens": {
+              "total": 304,
+              "mean_per_case": 30.4,
+              "usage_type_counts": {
+                "actual": 10
+              },
+              "unknown_usage_step_count": 0,
+              "unknown_usage_case_ids": []
+            },
+            "quality": {
+              "scored_count": 10,
+              "unscored_count": 0,
+              "passed_count": 8,
+              "missing_score_count": 0,
+              "scoring_error_count": 0,
+              "judge_disabled_count": 0,
+              "score_status_counts": {
+                "scored": 10
+              },
+              "pass_rate_scored": 0.8,
+              "pass_rate_all_cases": 0.8,
+              "mean_score_scored": 0.8333,
+              "mean_score_all_cases": 0.8333,
+              "passed_case_ids": [
+                "case-001",
+                "case-002",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-010"
+              ],
+              "scored_case_ids": [
+                "case-001",
+                "case-002",
+                "case-003",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-009",
+                "case-010"
+              ],
+              "unscored_case_ids": [],
+              "missing_score_case_ids": [],
+              "scoring_error_case_ids": [],
+              "judge_disabled_case_ids": [],
+              "critical_missed_case_ids": [
+                "case-003",
+                "case-009"
+              ]
+            },
+            "harness2": {
+              "judge_status_counts": {},
+              "judge_scored_count": 0,
+              "judge_failure_count": 0,
+              "judge_agreement_count": 0,
+              "judge_disagreement_count": 0,
+              "evidence_ref_count": 0,
+              "evidence_error_count": 0,
+              "persistence_error_count": 0
+            }
+          },
+          "cases": [
+            {
+              "case_id": "case-001",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "360fec41-3a6b-4d6a-b3a7-4a8426c3a901",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0644,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 33,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 33,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 45,
+                  "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-002",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "fa9806fc-a13b-45ae-95d0-57397e41d97b",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0545,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 27,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 24,
+                  "output_excerpt": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-003",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "aaeed38e-7dc5-427a-b1f0-0c2e0a7db7ea",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0562,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 28,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 28,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 30,
+                  "output_excerpt": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.3333,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r3"
+                ],
+                "missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 1.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 1/3 个评分点（权重 1.0/3.0，score=0.3333）；阈值 0.75；critical 缺失：['r1', 'r2'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-004",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "74388134-f057-48ca-b13e-57f7d95ae7ef",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0502,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 29,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "敏捷的棕色狐狸跳过了那只懒狗。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 29,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 56,
+                  "output_excerpt": "敏捷的棕色狐狸跳过了那只懒狗。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-005",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "f5240432-460a-456a-b667-c41b9966943a",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0596,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 36,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 36,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 52,
+                  "output_excerpt": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-006",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "8192ea8e-74ef-41c5-9c85-119d42eb6225",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0497,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 38,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 38,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 32,
+                  "output_excerpt": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-007",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "060e3e4d-724c-4e89-93cf-5752d6067f75",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0585,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 27,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 27,
+                  "output_excerpt": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-008",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "7b6d724f-0555-4095-a718-24cd09170ed8",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0558,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 24,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "行动胜于雄辩。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 24,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 44,
+                  "output_excerpt": "行动胜于雄辩。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-009",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "846b6915-f342-4124-a69c-190f0f7777c3",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0709,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 31,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "可以使用 reverse() 方法原地反转字符串。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 53,
+                  "output_excerpt": "可以使用 reverse() 方法原地反转字符串。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.0,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [],
+                "missed_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [
+                  "r1"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 0.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 0/3 个评分点（权重 0.0/3.0，score=0.0）；阈值 0.75；critical 缺失：['r1'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-010",
+              "config": "single",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-single",
+              "fingerprint": "3141640de8c5b3ae",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-single",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "6c8da5c3-7c43-4ef3-8ccf-40dbed56a16f",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.048,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 31,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "answer",
+                  "step_index": 0,
+                  "agent_name": "solver",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 33,
+                  "output_excerpt": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            }
+          ]
+        },
+        {
+          "config_name": "sequential",
+          "candidate_id": "harness2-f7fbb51bd69b-sequential",
+          "candidate_name": "sequential",
+          "fingerprint": "e58ce8dbbeac385c",
+          "config_version": "1.0.0",
+          "pattern": "sequential",
+          "engine_pattern": "sequential",
+          "description": "两 Agent 串行：先起草，再复核并输出最终答案",
+          "model": "fake-scripted-v1",
+          "steps": [
+            {
+              "step_id": "draft",
+              "agent_name": "drafter"
+            },
+            {
+              "step_id": "review",
+              "agent_name": "reviewer"
+            }
+          ],
+          "adapter": {
+            "mode": "fake",
+            "adapter_id": "scripted-fake-v1",
+            "network": false,
+            "deterministic": true,
+            "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+            "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+          },
+          "judge": {
+            "mode": "deterministic",
+            "adapter": "deterministic-rubric-v2",
+            "model": null,
+            "network": false,
+            "deterministic": true,
+            "version": "2.0.0",
+            "pass_threshold_default": 0.75,
+            "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+          },
+          "tracing": {
+            "enabled": false
+          },
+          "metrics": {
+            "case_count": 10,
+            "status_counts": {
+              "completed": 10
+            },
+            "execution": {
+              "completed_count": 10,
+              "partial_count": 0,
+              "failed_count": 0,
+              "execution_success_rate": 1.0,
+              "failed_case_ids": [],
+              "partial_case_ids": [],
+              "trace_id_present_count": 0,
+              "trace_id_case_ids": []
+            },
+            "timing": {
+              "total_seconds": 0.7077,
+              "mean_seconds": 0.0708,
+              "median_seconds": 0.0716,
+              "max_seconds": 0.0821
+            },
+            "tokens": {
+              "total": 618,
+              "mean_per_case": 61.8,
+              "usage_type_counts": {
+                "actual": 10
+              },
+              "unknown_usage_step_count": 0,
+              "unknown_usage_case_ids": []
+            },
+            "quality": {
+              "scored_count": 10,
+              "unscored_count": 0,
+              "passed_count": 8,
+              "missing_score_count": 0,
+              "scoring_error_count": 0,
+              "judge_disabled_count": 0,
+              "score_status_counts": {
+                "scored": 10
+              },
+              "pass_rate_scored": 0.8,
+              "pass_rate_all_cases": 0.8,
+              "mean_score_scored": 0.8333,
+              "mean_score_all_cases": 0.8333,
+              "passed_case_ids": [
+                "case-001",
+                "case-002",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-010"
+              ],
+              "scored_case_ids": [
+                "case-001",
+                "case-002",
+                "case-003",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-009",
+                "case-010"
+              ],
+              "unscored_case_ids": [],
+              "missing_score_case_ids": [],
+              "scoring_error_case_ids": [],
+              "judge_disabled_case_ids": [],
+              "critical_missed_case_ids": [
+                "case-003",
+                "case-009"
+              ]
+            },
+            "harness2": {
+              "judge_status_counts": {},
+              "judge_scored_count": 0,
+              "judge_failure_count": 0,
+              "judge_agreement_count": 0,
+              "judge_disagreement_count": 0,
+              "evidence_ref_count": 0,
+              "evidence_error_count": 0,
+              "persistence_error_count": 0
+            }
+          },
+          "cases": [
+            {
+              "case_id": "case-001",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "548daaef-2374-4a71-b212-8fb1e92fbd6f",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.077,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 69,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "[fake-adapter] list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 33,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 45,
+                  "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 36,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 41,
+                  "output_excerpt": "[fake-adapter] list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-002",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "6ee85dfd-6c3c-47eb-a904-4b63b67115e5",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0775,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 57,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 24,
+                  "output_excerpt": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 30,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 39,
+                  "output_excerpt": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-003",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "6701a600-990d-48f2-9a5b-e08242370fc3",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0593,
+              "workflow_duration_seconds": 0.0002,
+              "total_tokens": 58,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 28,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 30,
+                  "output_excerpt": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 30,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 38,
+                  "output_excerpt": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.3333,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r3"
+                ],
+                "missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 1.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 1/3 个评分点（权重 1.0/3.0，score=0.3333）；阈值 0.75；critical 缺失：['r1', 'r2'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-004",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "e4cf6abc-7c2b-4188-8a83-0bd66c95d654",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0729,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 51,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "[fake-adapter] 敏捷的棕色狐狸跳过了那只懒狗。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 29,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 56,
+                  "output_excerpt": "敏捷的棕色狐狸跳过了那只懒狗。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 22,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 15,
+                  "output_excerpt": "[fake-adapter] 敏捷的棕色狐狸跳过了那只懒狗。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-005",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "32717209-e359-44b1-888f-749566b39494",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0673,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 70,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 36,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 52,
+                  "output_excerpt": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 34,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 45,
+                  "output_excerpt": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-006",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "5670c050-940f-4134-9d58-33bf31a1a252",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0584,
+              "workflow_duration_seconds": 0.0002,
+              "total_tokens": 90,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "[fake-adapter] == 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 38,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 32,
+                  "output_excerpt": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 52,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 75,
+                  "output_excerpt": "[fake-adapter] == 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-007",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "3cdc42cd-e359-4ec6-a6d0-074801a0beef",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0821,
+              "workflow_duration_seconds": 0.0002,
+              "total_tokens": 57,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 27,
+                  "output_excerpt": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 30,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 36,
+                  "output_excerpt": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-008",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "2d0082ec-2bbd-479e-a241-327188a57c4b",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0702,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 42,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "[fake-adapter] 行动胜于雄辩。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 24,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 44,
+                  "output_excerpt": "行动胜于雄辩。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 18,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 7,
+                  "output_excerpt": "[fake-adapter] 行动胜于雄辩。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-009",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "df0c4beb-472d-487c-891a-e4d7a085d94f",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0692,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 59,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "[fake-adapter] 可以使用 reverse() 方法原地反转字符串。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 53,
+                  "output_excerpt": "可以使用 reverse() 方法原地反转字符串。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 28,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 25,
+                  "output_excerpt": "[fake-adapter] 可以使用 reverse() 方法原地反转字符串。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.0,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [],
+                "missed_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [
+                  "r1"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 0.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 0/3 个评分点（权重 0.0/3.0，score=0.0）；阈值 0.75；critical 缺失：['r1'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-010",
+              "config": "sequential",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-sequential",
+              "fingerprint": "e58ce8dbbeac385c",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-sequential",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "d56850d7-7a03-43fd-ac08-9350e5fa504f",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0738,
+              "workflow_duration_seconds": 0.0001,
+              "total_tokens": 65,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。",
+              "output_source": "final_result",
+              "step_results": [
+                {
+                  "step_id": "draft",
+                  "step_index": 0,
+                  "agent_name": "drafter",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 33,
+                  "output_excerpt": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。"
+                },
+                {
+                  "step_id": "review",
+                  "step_index": 1,
+                  "agent_name": "reviewer",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 34,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 47,
+                  "output_excerpt": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            }
+          ]
+        },
+        {
+          "config_name": "parallel",
+          "candidate_id": "harness2-f7fbb51bd69b-parallel",
+          "candidate_name": "parallel",
+          "fingerprint": "07296a8c12c7533a",
+          "config_version": "1.0.0",
+          "pattern": "parallel",
+          "engine_pattern": "parallel",
+          "description": "两 Agent 并行独立作答，结果聚合后评分",
+          "model": "fake-scripted-v1",
+          "steps": [
+            {
+              "step_id": "answer_a",
+              "agent_name": "solver_a"
+            },
+            {
+              "step_id": "answer_b",
+              "agent_name": "solver_b"
+            }
+          ],
+          "adapter": {
+            "mode": "fake",
+            "adapter_id": "scripted-fake-v1",
+            "network": false,
+            "deterministic": true,
+            "usage_note": "假适配器自报的 token 计数由确定性规则生成，仅用于验证计量机制，不代表真实计费。",
+            "note": "脚本化确定性假模型；不调用任何网络或付费模型。"
+          },
+          "judge": {
+            "mode": "deterministic",
+            "adapter": "deterministic-rubric-v2",
+            "model": null,
+            "network": false,
+            "deterministic": true,
+            "version": "2.0.0",
+            "pass_threshold_default": 0.75,
+            "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+          },
+          "tracing": {
+            "enabled": false
+          },
+          "metrics": {
+            "case_count": 10,
+            "status_counts": {
+              "completed": 10
+            },
+            "execution": {
+              "completed_count": 10,
+              "partial_count": 0,
+              "failed_count": 0,
+              "execution_success_rate": 1.0,
+              "failed_case_ids": [],
+              "partial_case_ids": [],
+              "trace_id_present_count": 0,
+              "trace_id_case_ids": []
+            },
+            "timing": {
+              "total_seconds": 0.5945,
+              "mean_seconds": 0.0595,
+              "median_seconds": 0.0585,
+              "max_seconds": 0.0711
+            },
+            "tokens": {
+              "total": 608,
+              "mean_per_case": 60.8,
+              "usage_type_counts": {
+                "actual": 10
+              },
+              "unknown_usage_step_count": 0,
+              "unknown_usage_case_ids": []
+            },
+            "quality": {
+              "scored_count": 10,
+              "unscored_count": 0,
+              "passed_count": 8,
+              "missing_score_count": 0,
+              "scoring_error_count": 0,
+              "judge_disabled_count": 0,
+              "score_status_counts": {
+                "scored": 10
+              },
+              "pass_rate_scored": 0.8,
+              "pass_rate_all_cases": 0.8,
+              "mean_score_scored": 0.8333,
+              "mean_score_all_cases": 0.8333,
+              "passed_case_ids": [
+                "case-001",
+                "case-002",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-010"
+              ],
+              "scored_case_ids": [
+                "case-001",
+                "case-002",
+                "case-003",
+                "case-004",
+                "case-005",
+                "case-006",
+                "case-007",
+                "case-008",
+                "case-009",
+                "case-010"
+              ],
+              "unscored_case_ids": [],
+              "missing_score_case_ids": [],
+              "scoring_error_case_ids": [],
+              "judge_disabled_case_ids": [],
+              "critical_missed_case_ids": [
+                "case-003",
+                "case-009"
+              ]
+            },
+            "harness2": {
+              "judge_status_counts": {},
+              "judge_scored_count": 0,
+              "judge_failure_count": 0,
+              "judge_agreement_count": 0,
+              "judge_disagreement_count": 0,
+              "evidence_ref_count": 0,
+              "evidence_error_count": 0,
+              "persistence_error_count": 0
+            }
+          },
+          "cases": [
+            {
+              "case_id": "case-001",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "50262acb-2990-4979-b4d6-da4c049d13fc",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0639,
+              "workflow_duration_seconds": 0.0004,
+              "total_tokens": 66,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。\n\nlist 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 33,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 45,
+                  "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 33,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 45,
+                  "output_excerpt": "list 是可变的，可以随时增删改元素；tuple 是不可变的，适合存放固定记录。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-002",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "9d20dbb5-731b-40de-a2ed-14aabdb02f7f",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0578,
+              "workflow_duration_seconds": 0.0004,
+              "total_tokens": 54,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。\n\n17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 24,
+                  "output_excerpt": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 24,
+                  "output_excerpt": "17 × 23 = 391，计算过程是 17 乘以 23，最终结果为 391。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-003",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "2832592b-1dd2-4ef0-8f84-43b74bae8017",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0533,
+              "workflow_duration_seconds": 0.0003,
+              "total_tokens": 56,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。\n\nHTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 28,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 30,
+                  "output_excerpt": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 28,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 30,
+                  "output_excerpt": "HTTP 404 和 HTTP 500 都是网络错误，主要区别在于颜色不同。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.3333,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r3"
+                ],
+                "missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [
+                  "r1",
+                  "r2"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 1.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 1/3 个评分点（权重 1.0/3.0，score=0.3333）；阈值 0.75；critical 缺失：['r1', 'r2'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-004",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "6adf2677-d681-4c85-9825-2e926a2a8694",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0563,
+              "workflow_duration_seconds": 0.0003,
+              "total_tokens": 58,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "敏捷的棕色狐狸跳过了那只懒狗。\n\n敏捷的棕色狐狸跳过了那只懒狗。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 29,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 56,
+                  "output_excerpt": "敏捷的棕色狐狸跳过了那只懒狗。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 29,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 56,
+                  "output_excerpt": "敏捷的棕色狐狸跳过了那只懒狗。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-005",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "7dad8fd9-ce04-4e9b-9fb8-6abbc398e889",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0561,
+              "workflow_duration_seconds": 0.0003,
+              "total_tokens": 72,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。\n\nsorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 36,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 52,
+                  "output_excerpt": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 36,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 52,
+                  "output_excerpt": "sorted([3, 1, 2]) 会返回新列表 [1, 2, 3]，不会原地修改原列表。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-006",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "f11c85eb-af54-4c86-bc7b-68b4490a247a",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0711,
+              "workflow_duration_seconds": 0.0004,
+              "total_tokens": 76,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。\n\n== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 38,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 32,
+                  "output_excerpt": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 38,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 32,
+                  "output_excerpt": "== 比较值是否相等，is 比较是否为同一个对象（身份）；例如 [1, 2] == [1, 2] 为 True，而两个独立列表 is 为 False。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-007",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "16736529-f832-4089-8eed-826d23ae4c44",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0662,
+              "workflow_duration_seconds": 0.0003,
+              "total_tokens": 54,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。\n\n144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 27,
+                  "output_excerpt": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0001,
+                  "total_tokens": 27,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 27,
+                  "output_excerpt": "144 ÷ 12 = 12，可以通过 12 × 12 = 144 验证。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-008",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "97dfb439-df43-4569-bf76-950171bf03a5",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0633,
+              "workflow_duration_seconds": 0.0004,
+              "total_tokens": 48,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "行动胜于雄辩。\n\n行动胜于雄辩。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 24,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 44,
+                  "output_excerpt": "行动胜于雄辩。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 24,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 44,
+                  "output_excerpt": "行动胜于雄辩。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 2,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 2/2 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-009",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "2dd6b11e-5574-4f7a-90e8-e5494d541dc3",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0591,
+              "workflow_duration_seconds": 0.0004,
+              "total_tokens": 62,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "可以使用 reverse() 方法原地反转字符串。\n\n可以使用 reverse() 方法原地反转字符串。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 53,
+                  "output_excerpt": "可以使用 reverse() 方法原地反转字符串。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0002,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 53,
+                  "output_excerpt": "可以使用 reverse() 方法原地反转字符串。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 0.0,
+                "passed": false,
+                "passed_score_only": false,
+                "pass_threshold": 0.75,
+                "matched_items": [],
+                "missed_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "critical_items": [
+                  "r1"
+                ],
+                "critical_missed_items": [
+                  "r1"
+                ],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 0.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 0/3 个评分点（权重 0.0/3.0，score=0.0）；阈值 0.75；critical 缺失：['r1'] → 不通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            },
+            {
+              "case_id": "case-010",
+              "config": "parallel",
+              "experiment_id": "harness2-f7fbb51bd69b",
+              "candidate_id": "harness2-f7fbb51bd69b-parallel",
+              "fingerprint": "07296a8c12c7533a",
+              "status": "completed",
+              "workflow_status": "completed",
+              "workflow_name": "experiment-parallel",
+              "record_schema_version": 4,
+              "workflow_error": null,
+              "stop_requested": false,
+              "failure_reason": null,
+              "error": null,
+              "run_id": "949dd75b-58f7-42a6-9c76-d6bf7cb12f9a",
+              "trace_id": null,
+              "trace_id_source": null,
+              "tracing_enabled": false,
+              "elapsed_seconds": 0.0474,
+              "workflow_duration_seconds": 0.0007,
+              "total_tokens": 62,
+              "unknown_usage_step_count": 0,
+              "usage_type": "actual",
+              "output": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。\n\nHTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。",
+              "output_source": "aggregated",
+              "step_results": [
+                {
+                  "step_id": "answer_a",
+                  "step_index": 0,
+                  "agent_name": "solver_a",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0004,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 33,
+                  "output_excerpt": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。"
+                },
+                {
+                  "step_id": "answer_b",
+                  "step_index": 1,
+                  "agent_name": "solver_b",
+                  "status": "completed",
+                  "attempts": 1,
+                  "error_type": null,
+                  "model": "fake-scripted-v1",
+                  "finish_reason": "stop",
+                  "duration_seconds": 0.0003,
+                  "total_tokens": 31,
+                  "usage_type": "actual",
+                  "usage_unknown": false,
+                  "error": null,
+                  "input_chars": 33,
+                  "output_excerpt": "HTTP 301 和 HTTP 302 的区别是：301 是永久重定向，302 是临时重定向。"
+                }
+              ],
+              "score": {
+                "method": "deterministic-rubric-v2",
+                "score": 1.0,
+                "passed": true,
+                "passed_score_only": true,
+                "pass_threshold": 0.75,
+                "matched_items": [
+                  "r1",
+                  "r2",
+                  "r3"
+                ],
+                "missed_items": [],
+                "critical_items": [
+                  "r1",
+                  "r2"
+                ],
+                "critical_missed_items": [],
+                "rubric_item_count": 3,
+                "weight_total": 3.0,
+                "weight_matched": 3.0,
+                "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配",
+                "scorer_version": "2.0.0",
+                "reason": "命中 3/3 个评分点（权重 3.0/3.0，score=1.0）；阈值 0.75；critical 缺失：无 → 通过",
+                "judge_mode": "deterministic",
+                "judge_adapter": "deterministic-rubric-v2",
+                "judge_model": null,
+                "judge_network": false
+              },
+              "score_status": "scored",
+              "score_source": "deterministic",
+              "scoring_error": null,
+              "scoring_error_type": null,
+              "missing_score": false,
+              "score_note": null,
+              "independent_judge": null,
+              "judge_status": null,
+              "evidence_ref": null,
+              "evidence_error": null,
+              "persistence_error": null
+            }
+          ]
+        }
+      ]
+    },
+    "error": null
+  },
+  "real_model_experiment": {
+    "status": "not_run_in_baseline",
+    "real_experiment_done_separately": {
+      "status": "run",
+      "path": "docs\\real_experiment_results.json",
+      "experiment_id": "experiment-57426f096f7c",
+      "created_at": "2026-10-24T17:32:30+08:00",
+      "adapter": {
+        "mode": "real",
+        "provider": "openai",
+        "model": "openai/gpt-4o-mini",
+        "network": true,
+        "deterministic": false,
+        "key_env": "OPENAI_API_KEY",
+        "key_present": true,
+        "note": "真实模型实验会产生费用；密钥值不会被记录或打印。"
+      },
+      "judge": {
+        "mode": "deterministic",
+        "adapter": "deterministic-rubric-v2",
+        "model": null,
+        "network": false,
+        "deterministic": true,
+        "version": "2.0.0",
+        "pass_threshold_default": 0.75,
+        "note": "确定性 rubric 评分（默认）：不联网、可复现；阈值与 critical 规则来自 expected_answers 的 calibration。"
+      },
+      "configs": [
+        {
+          "config": "single",
+          "completed": 10,
+          "passed": 6,
+          "cases": 10,
+          "pass_rate_all_cases": 0.6,
+          "total_tokens": 1358,
+          "total_seconds": 23.0369,
+          "trace_id_present_count": 10
+        },
+        {
+          "config": "sequential",
+          "completed": 10,
+          "passed": 5,
+          "cases": 10,
+          "pass_rate_all_cases": 0.5,
+          "total_tokens": 6454,
+          "total_seconds": 61.3496,
+          "trace_id_present_count": 10
+        },
+        {
+          "config": "parallel",
+          "completed": 10,
+          "passed": 8,
+          "cases": 10,
+          "pass_rate_all_cases": 0.8,
+          "total_tokens": 3546,
+          "total_seconds": 31.3798,
+          "trace_id_present_count": 10
+        }
+      ],
+      "note": "真实模型实验由独立受控运行完成，不在本基线脚本内执行；数字见该文件与 docs/EXPERIMENTS_REPORT.md C1。"
+    },
+    "reason": "本次基线按设计只运行确定性假适配器；真实模型路径需要人工显式开启，基线脚本不会自动调用任何付费模型。",
+    "env_flag": "AGENTFLOW_EXPERIMENT_REAL",
+    "env_flag_set_now": false,
+    "env_flag_default": "未设置（默认关闭）",
+    "judge_env_flag": "AGENTFLOW_EXPERIMENT_LLM_JUDGE",
+    "judge_env_flag_set_now": false,
+    "key_envs_present": {
+      "ANTHROPIC_API_KEY": false,
+      "DEEPSEEK_API_KEY": false,
+      "OPENAI_API_KEY": false,
+      "OPENROUTER_API_KEY": false
+    },
+    "estimated_samples": {
+      "cases": 10,
+      "configs": 3,
+      "executions": 30,
+      "llm_judge_extra_calls_if_enabled": 30,
+      "note": "预计样本仅按固定数据集与配置计算；真实耗时/成本未知，不编造成本数字。"
+    },
+    "required_conditions": [
+      "设置 AGENTFLOW_EXPERIMENT_REAL=1",
+      "命令行显式加 --real",
+      "选择 provider：AGENTFLOW_EXPERIMENT_PROVIDER（默认 openai）",
+      "对应 provider 的密钥环境变量存在（只检查是否存在，不打印值）",
+      "指定模型：--real-model 或 AGENTFLOW_EXPERIMENT_MODEL",
+      "若要 --judge llm：额外设置 AGENTFLOW_EXPERIMENT_LLM_JUDGE=1（额外评审调用会产生费用）",
+      "若要记录 trace_id：配置 Langfuse 并显式加 --tracing"
+    ],
+    "enable_steps": [
+      "export AGENTFLOW_EXPERIMENT_REAL=1  # Windows PowerShell: $env:AGENTFLOW_EXPERIMENT_REAL='1'",
+      "export AGENTFLOW_EXPERIMENT_PROVIDER=openai  # 或 deepseek / anthropic / openrouter",
+      "export OPENAI_API_KEY=<密钥>  # 按 provider 选择对应变量；不要写进仓库",
+      "export AGENTFLOW_EXPERIMENT_MODEL=<模型名>",
+      "export AGENTFLOW_EXPERIMENT_LLM_JUDGE=1  # 仅 --judge llm 时需要",
+      "cd backend && python scripts/run_experiment.py --real --config all --judge deterministic --output ../experiments/real_run_deterministic.json",
+      "cd backend && python scripts/run_experiment.py --real --config all --judge llm --output ../experiments/real_run_llm_judge.json",
+      "cd backend && python scripts/run_experiment.py --real --config all --judge deterministic --tracing --output ../experiments/real_run_traced.json"
+    ],
+    "command_example": "cd backend && python scripts/run_experiment.py --real --config all --judge deterministic --output ../experiments/real_run_deterministic.json",
+    "note": "C 节当前没有任何数字。真实模型跑完后需人工审阅结果并单独补充本节，禁止用 B 节假模型数字替代真实模型质量/成本结论。"
+  },
+  "limitations": [
+    "真实模型实验未运行：没有任何真实模型质量、延迟或成本数据；C 节只是受控执行入口。",
+    "假适配器输出为人工编写的脚本文本，B 节质量数字只能证明评分/执行/记录链路，不能代表真实模型质量。",
+    "评分器为 rubric v2（关键词/短语 + critical 规则），无法评判语义等价、推理过程正确性等；存在误判可能。",
+    "固定数据集只有 10 个 case，不具统计代表性；结论不可外推到其他任务。",
+    "耗时为本机毫秒级调度结果，不能外推为真实模型延迟；token 为假适配器合成值。",
+    "本次未开启 Langfuse 追踪，trace_id 全为 null；字段与映射逻辑就绪，但尚未产生真实 trace。",
+    "本轮未覆盖并发/多进程/真实网络故障等场景，成功率不代表生产环境可靠性；后端 v3 的 attempts/error_type 字段已记录，但真实重试/超时未被触发。"
+  ]
+}

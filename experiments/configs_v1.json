@@ -1,0 +1,58 @@
+{
+  "config_version": "1.0.0",
+  "frozen_at": "2026-10-24",
+  "description": "实验配置定义（冻结）：single = 单 Agent 单步；sequential = 两 Agent 串行（起草 + 复核）；parallel = 两 Agent 并行后聚合。假适配器模式下输出预先编写的确定性文本，用于验证执行/评分机制，不代表真实模型能力。",
+  "defaults": {
+    "temperature": 0.0,
+    "max_tokens": 512,
+    "fake_model": "fake-scripted-v1"
+  },
+  "configs": {
+    "single": {
+      "pattern": "single",
+      "engine_pattern": "sequential",
+      "description": "单 Agent 单步直接作答（实验层 single；底层为 1 步 sequential 引擎模式）",
+      "steps": [
+        {
+          "step_id": "answer",
+          "agent_name": "solver",
+          "system_prompt": "你是 AgentFlow 实验中的答题助手。只依据用户给出的任务直接、简洁、可核验地作答。"
+        }
+      ]
+    },
+    "sequential": {
+      "pattern": "sequential",
+      "engine_pattern": "sequential",
+      "description": "两 Agent 串行：先起草，再复核并输出最终答案",
+      "steps": [
+        {
+          "step_id": "draft",
+          "agent_name": "drafter",
+          "system_prompt": "你是 AgentFlow 实验中的起草员。针对用户任务给出完整、准确的初稿。"
+        },
+        {
+          "step_id": "review",
+          "agent_name": "reviewer",
+          "system_prompt": "你是 AgentFlow 实验中的复核员。检查上一步初稿，保留并补全正确信息，输出最终答案。"
+        }
+      ]
+    },
+    "parallel": {
+      "pattern": "parallel",
+      "engine_pattern": "parallel",
+      "description": "两 Agent 并行独立作答，结果聚合后评分",
+      "steps": [
+        {
+          "step_id": "answer_a",
+          "agent_name": "solver_a",
+          "system_prompt": "你是 AgentFlow 实验中的答题助手 A。只依据用户给出的任务直接、简洁、可核验地作答。"
+        },
+        {
+          "step_id": "answer_b",
+          "agent_name": "solver_b",
+          "system_prompt": "你是 AgentFlow 实验中的答题助手 B。独立作答，答案应完整且可核验。"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "dataset_id": "agentflow-fixed-v1",
+  "dataset_version": "1.0.0",
+  "scorer_version": "1.0.0",
+  "frozen_at": "2026-10-24",
+  "description": "预期答案与评分要点（v1）。仅供评分器读取，绝不能拼进发送给生成模型的任何消息。评分规则：rubric 条目权重之和为分母，命中条目的权重之和为分子；分数 >= pass_threshold 视为通过。",
+  "scoring_notes": "命中的判定：条目的 all_of 中所有短语都出现在（规范化后的）模型输出中，且 any_of 为空或至少一个短语出现。规范化 = NFKC + casefold + 空白折叠。",
+  "answers": [
+    {
+      "case_id": "case-001",
+      "reference_answer": "list 是可变的（可增删改），tuple 是不可变的；list 适合频繁修改的集合，tuple 适合固定记录或作为字典键。",
+      "pass_threshold": 0.75,
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "指出 list 可变",
+          "all_of": ["list"],
+          "any_of": ["可变", "mutable"],
+          "weight": 1
+        },
+        {
+          "item_id": "r2",
+          "description": "指出 tuple 不可变",
+          "all_of": ["tuple"],
+          "any_of": ["不可变", "immutable"],
+          "weight": 1
+        },
+        {
+          "item_id": "r3",
+          "description": "给出适用场景",
+          "any_of": ["适合", "场景", "用于"],
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "case_id": "case-002",
+      "reference_answer": "17 × 23 = 391，最终结果为 391。",
+      "pass_threshold": 0.75,
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "最终结果正确：391",
+          "any_of": ["391"],
+          "weight": 2
+        },
+        {
+          "item_id": "r2",
+          "description": "给出计算过程（两个乘数 + 乘法符号/文字）",
+          "all_of": ["17", "23"],
+          "any_of": ["×", "乘", "*"],
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "case_id": "case-003",
+      "reference_answer": "404 表示请求的资源未找到（客户端侧），500 表示服务器内部错误（服务端故障）。",
+      "pass_threshold": 0.75,
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "解释 404 = 资源未找到",
+          "all_of": ["404"],
+          "any_of": ["未找到", "not found", "资源不存在"],
+          "weight": 1
+        },
+        {
+          "item_id": "r2",
+          "description": "解释 500 = 服务器内部错误",
+          "all_of": ["500"],
+          "any_of": ["服务器内部错误", "服务端错误", "服务器故障"],
+          "weight": 1
+        },
+        {
+          "item_id": "r3",
+          "description": "点明两者区别",
+          "any_of": ["区别", "不同", "客户端", "服务端"],
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "case_id": "case-004",
+      "reference_answer": "敏捷的棕色狐狸跳过了那只懒狗。",
+      "pass_threshold": 0.75,
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "翻译出主语短语",
+          "any_of": ["敏捷的棕色狐狸", "敏捷的棕狐狸"],
+          "weight": 1
+        },
+        {
+          "item_id": "r2",
+          "description": "翻译出动作",
+          "any_of": ["跳过", "跃过"],
+          "weight": 1
+        },
+        {
+          "item_id": "r3",
+          "description": "翻译出宾语",
+          "any_of": ["懒狗", "懒惰的狗"],
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "case_id": "case-005",
+      "reference_answer": "sorted([3, 1, 2]) 返回新列表 [1, 2, 3]，不会原地修改原列表。",
+      "pass_threshold": 0.75,
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "使用 sorted 表达式",
+          "any_of": ["sorted([3, 1, 2])"],
+          "weight": 1
+        },
+        {
+          "item_id": "r2",
+          "description": "给出排序结果 [1, 2, 3]",
+          "any_of": ["[1, 2, 3]"],
+          "weight": 1
+        },
+        {
+          "item_id": "r3",
+          "description": "说明非原地修改",
+          "any_of": ["不会原地", "不原地", "新列表", "不修改"],
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

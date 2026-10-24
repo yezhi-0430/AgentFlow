@@ -1,0 +1,327 @@
+{
+  "dataset_id": "agentflow-fixed-v2",
+  "dataset_version": "2.0.0",
+  "scorer_version": "2.0.0",
+  "frozen_at": "2026-10-24",
+  "description": "预期答案、评分要点与 rubric 校准信息（v2）。仅供评分器/judge 读取，绝不能拼进发送给生成模型的任何消息。评分方式见 scoring_method，阈值与通过标准见 calibration。",
+  "scoring_method": {
+    "name": "deterministic-rubric-v2",
+    "normalization": "NFKC + casefold + 连续空白折叠为单个空格，再做子串匹配。",
+    "match_rule": "单个条目的 all_of 中所有短语都出现，且 any_of 为空或至少一个短语出现，即视为命中；score = 命中条目权重之和 / 全部条目权重之和，四舍五入到 4 位小数。",
+    "pass_rule": "passed = (score >= pass_threshold) 且该 case 标记为 critical 的条目全部命中。未定义 critical 条目时只看分数阈值。",
+    "judge_compatibility": "同一份 rubric 可被确定性评分器（默认）使用，也可作为可选 LLM judge 的参考材料；LLM judge 只改变评分执行方式，不改变答案隔离规则，也不改变评分失败/缺失的区分方式。"
+  },
+  "calibration": {
+    "pass_threshold_default": 0.75,
+    "threshold_rationale": "3 个等权条目时 0.75 对应“至少命中 2 项”，比 0.5 更严格：要求关键结论加至少一个支撑细节，同时允许非关键细节因表述差异缺失。2 个条目、权重为 2+1 时，0.75 需要至少 1.5 权重命中，等价于权重大者必须命中；单条目 rubric 则要求该条目命中。",
+    "critical_rule_rationale": "对事实性关键结论（最终数值、关键定义、核心区别）标记 critical。即使总分达到阈值，只要 critical 条目缺失就判不通过，避免“命中若干辅助关键词但结论错误”被误判为正确。",
+    "bands": [
+      {
+        "range": "1.0",
+        "meaning": "全部评分点命中，通过"
+      },
+      {
+        "range": "0.75-0.999",
+        "meaning": "达到阈值且 critical 全部命中，通过；允许非关键细节缺失"
+      },
+      {
+        "range": "0.5-0.749",
+        "meaning": "部分正确但未达阈值，不通过"
+      },
+      {
+        "range": "0.0-0.499",
+        "meaning": "基本错误或答非所问，不通过"
+      }
+    ],
+    "calibration_evidence": "v2 用确定性假适配器预设的 8 条正确回答与 2 条故意错误回答校准：正确回答得 1.0；case-003 的错误回答只命中 1/3 权重（0.3333）且缺失 critical r1；case-009 的错误回答命中 0（0.0）且缺失 critical r1。该证据只证明评分器能区分预设正确/错误回答，不代表真实模型质量。",
+    "threshold_note": "阈值与 band 属于冻结实验工件；修改时必须提升 scorer_version，并同步更新 runner 的 SCORER_VERSION。"
+  },
+  "answers": [
+    {
+      "case_id": "case-001",
+      "reference_answer": "list 是可变的（可增删改），tuple 是不可变的；list 适合频繁修改的集合，tuple 适合固定记录或作为字典键。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；list 可变与 tuple 不可变是核心事实，标记 critical，场景项为非关键。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "指出 list 可变",
+          "all_of": ["list"],
+          "any_of": ["可变", "mutable"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "指出 tuple 不可变",
+          "all_of": ["tuple"],
+          "any_of": ["不可变", "immutable"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r3",
+          "description": "给出适用场景",
+          "any_of": ["适合", "场景", "用于"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-002",
+      "reference_answer": "17 × 23 = 391，最终结果为 391。",
+      "pass_threshold": 0.75,
+      "calibration_note": "权重 2+1=3；只给结果得 0.6667 < 0.75，必须同时写出乘数与乘法过程才通过；最终结果 391 标记 critical。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "最终结果正确：391",
+          "any_of": ["391"],
+          "weight": 2,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "给出计算过程（两个乘数 + 乘法符号/文字）",
+          "all_of": ["17", "23"],
+          "any_of": ["×", "乘", "*"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-003",
+      "reference_answer": "404 表示请求的资源未找到（客户端侧），500 表示服务器内部错误（服务端故障）。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；两个状态码各自的含义都标记 critical，只提到“都是错误”不通过。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "解释 404 = 资源未找到",
+          "all_of": ["404"],
+          "any_of": ["未找到", "not found", "资源不存在"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "解释 500 = 服务器内部错误",
+          "all_of": ["500"],
+          "any_of": ["服务器内部错误", "服务端错误", "服务器故障"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r3",
+          "description": "点明两者区别（客户端 vs 服务端）",
+          "any_of": ["区别", "不同", "客户端", "服务端"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-004",
+      "reference_answer": "敏捷的棕色狐狸跳过了那只懒狗。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权翻译要点，0.75 实际要求 3 项全中（2/3=0.6667 不足）；主语短语标记 critical，避免只翻译出动作或宾语。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "翻译出主语短语",
+          "any_of": ["敏捷的棕色狐狸", "敏捷的棕狐狸"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "翻译出动作",
+          "any_of": ["跳过", "跃过"],
+          "weight": 1,
+          "critical": false
+        },
+        {
+          "item_id": "r3",
+          "description": "翻译出宾语",
+          "any_of": ["懒狗", "懒惰的狗"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-005",
+      "reference_answer": "sorted([3, 1, 2]) 返回新列表 [1, 2, 3]，不会原地修改原列表。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；排序结果 [1, 2, 3] 标记 critical，“是否原地修改”为非关键补充。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "使用 sorted 表达式",
+          "any_of": ["sorted([3, 1, 2])"],
+          "weight": 1,
+          "critical": false
+        },
+        {
+          "item_id": "r2",
+          "description": "给出排序结果 [1, 2, 3]",
+          "any_of": ["[1, 2, 3]"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r3",
+          "description": "说明非原地修改",
+          "any_of": ["不会原地", "不原地", "新列表", "不修改"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-006",
+      "reference_answer": "== 比较值（内容）是否相等，is 比较是否为同一个对象（身份/引用）；例如两个内容相同的独立列表 == 为 True，但 is 为 False。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；== 与 is 的语义差异都标记 critical，举例项为非关键。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "说明 == 比较值/内容相等",
+          "all_of": ["=="],
+          "any_of": ["值", "相等", "内容"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "说明 is 比较身份/同一对象",
+          "all_of": ["is"],
+          "any_of": ["身份", "同一对象", "同一个对象", "引用"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r3",
+          "description": "给出例子",
+          "any_of": ["例如", "比如", "举例"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-007",
+      "reference_answer": "144 ÷ 12 = 12；可以用 12 × 12 = 144 验证。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；结果 12 标记 critical，除法过程与乘法验证各自计分。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "结果正确：12",
+          "any_of": ["12"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "写出除法过程（被除数 + 除数 + 除号）",
+          "all_of": ["144", "12"],
+          "any_of": ["÷", "除", "/"],
+          "weight": 1,
+          "critical": false
+        },
+        {
+          "item_id": "r3",
+          "description": "说明用乘法验证",
+          "any_of": ["验证", "乘", "×"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-008",
+      "reference_answer": "行动胜于雄辩（事实胜于雄辩）。",
+      "pass_threshold": 0.75,
+      "calibration_note": "核心谚语权重 2/3，且标记 critical；0.75 要求至少 1.5 权重命中，因此核心谚语必须译出。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "译出核心谚语含义",
+          "any_of": ["行动胜于雄辩", "事实胜于雄辩", "行动比语言"],
+          "weight": 2,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "译文完整、包含“雄辩/空谈/语言”语义",
+          "any_of": ["雄辩", "空谈", "语言"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-009",
+      "reference_answer": "'AgentFlow'[::-1] 返回 'wolfrevA'；切片反转不会修改原字符串（字符串不可变）。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；反转表达式标记 critical，避免只说“有反转方法”就给分。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "给出反转切片表达式",
+          "any_of": ["[::-1]", "反转切片", "reversed("],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "给出反转结果 wolfrevA",
+          "any_of": ["wolfrevA"],
+          "weight": 1,
+          "critical": false
+        },
+        {
+          "item_id": "r3",
+          "description": "说明不修改原字符串/返回新字符串",
+          "any_of": ["不会修改", "不修改", "原字符串", "新字符串", "不改变"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "case-010",
+      "reference_answer": "301 是永久重定向（资源永久移动），302 是临时重定向；浏览器/搜索引擎对两者的缓存行为不同。",
+      "pass_threshold": 0.75,
+      "calibration_note": "3 个等权条目，0.75 要求至少 2 项；两个状态码的永久/临时语义都标记 critical。",
+      "rubric": [
+        {
+          "item_id": "r1",
+          "description": "说明 301 是永久重定向",
+          "all_of": ["301"],
+          "any_of": ["永久"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r2",
+          "description": "说明 302 是临时重定向",
+          "all_of": ["302"],
+          "any_of": ["临时"],
+          "weight": 1,
+          "critical": true
+        },
+        {
+          "item_id": "r3",
+          "description": "点明两者区别",
+          "any_of": ["区别", "不同"],
+          "weight": 1,
+          "critical": false
+        }
+      ]
+    }
+  ]
+}
