@@ -26,6 +26,20 @@ export const workflowService = {
   },
 
   /**
+   * 导出工作流定义（版本化 JSON，不含密钥）
+   */
+  async getWorkflowDefinition(workflowId) {
+    return api.get(`/api/workflows/${workflowId}/definition`)
+  },
+
+  /**
+   * 导入工作流定义（后端分配新 workflow_id，导入后需要重新提供 API Key）
+   */
+  async importWorkflow(definition) {
+    return api.post('/api/workflows/import', definition)
+  },
+
+  /**
    * 执行工作流
    */
   async executeWorkflow(workflowId, config) {

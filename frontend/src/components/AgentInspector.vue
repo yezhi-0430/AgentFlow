@@ -24,6 +24,6 @@ defineEmits(['close'])
 const workflowStore = useWorkflowStore()
 const selectedAgent = computed(() => workflowStore.selectedAgent)
 const roleLabels = { coordinator: '协调者', worker: '工作者', reviewer: '审核者', specialist: '领域专家' }
-const statusLabels = { idle: '就绪', running: '运行中', waiting: '等待中', completed: '已完成', error: '异常', paused: '已暂停' }
+const statusLabels = { idle: '就绪', running: '运行中', waiting: '等待中', completed: '已完成', error: '异常', paused: '已暂停', unavailable: '需要 API Key' }
 const patternLabels = { sequential: '顺序执行', parallel: '并行执行', hierarchical: '层次协作', debate: '辩论模式' }
 </script>

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { applyAuthHeader } from '../utils/apiAuth.js'
 
 const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -10,12 +11,10 @@ const api = axios.create({
   },
 })
 
-// 请求拦截器
+// 请求拦截器：后端设置 AGENTFLOW_API_TOKEN 时，前端用 VITE_API_TOKEN 附加 Bearer 头。
+// token 只进入请求头，不打印、不持久化；未设置时不添加任何 Authorization。
 api.interceptors.request.use(
-  (config) => {
-    // 可以在这里添加 token 等
-    return config
-  },
+  (config) => applyAuthHeader(config, import.meta.env?.VITE_API_TOKEN),
   (error) => {
     return Promise.reject(error)
   }

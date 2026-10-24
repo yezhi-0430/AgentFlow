@@ -143,6 +143,16 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .execution-notice > span { flex: 1; min-width: 0; white-space: pre-wrap; }
 .execution-notice > svg { flex-shrink: 0; margin-top: 3px; }
 .execution-hint { font-size: 11px; color: #888; padding-left: 8px; }
+.latest-run { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 10px; padding: 9px 14px; background: #f7f7f7; border: 1px solid #e7e7e7; border-radius: 8px; font-size: 11px; color: #777; }
+.latest-run-label { display: inline-flex; align-items: center; gap: 6px; color: #888; }
+.latest-run-id { font: 11px ui-monospace, Consolas, monospace; color: #4a4a4a; }
+.latest-run-status { padding: 2px 8px; border-radius: 999px; font-size: 10px; line-height: 1.7; background: #ededed; color: #555; }
+.latest-run-status.is-success { background: #e3f2e8; color: #2f6b45; }
+.latest-run-status.is-error { background: #fbe5e5; color: #9b2c2c; }
+.latest-run-status.is-warning { background: #fbf1dc; color: #8a5a12; }
+.latest-run-status.is-running { background: #e4edf9; color: #2f5a8a; }
+.latest-run-status.is-neutral { background: #ececec; color: #4d4d4d; }
+.latest-run-time { color: #9a9a9a; }
 @media (max-width: 760px) {
   .execution-task label { align-items: flex-start; flex-direction: column; gap: 5px; }
   .execution-hint { font-size: 10px; }

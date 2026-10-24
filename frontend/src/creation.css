@@ -30,6 +30,13 @@
 .creation-dialog .pattern-desc { font-size: 10px; color: #949494; line-height: 1.5; }
 .creation-dialog .radio-indicator { width: 11px; height: 11px; }
 .creation-dialog .radio-indicator span { width: 5px; height: 5px; }
+.creation-dialog .pattern-option.is-disabled { background: #fafafa; border-color: #ececec; color: #a8a8a8; cursor: not-allowed; }
+.creation-dialog .pattern-option.is-disabled:hover { background: #fafafa; border-color: #ececec; }
+.creation-dialog .pattern-option.is-disabled > svg { color: #c2c2c2; }
+.creation-dialog .pattern-option.is-disabled .pattern-name { color: #9a9a9a; }
+.creation-dialog .pattern-option.is-disabled .pattern-desc { color: #b2b2b2; }
+.creation-dialog .pattern-unsupported { margin-left: auto; flex-shrink: 0; padding: 2px 7px; border: 1px solid #e3e3e3; border-radius: 999px; background: #fff; color: #8f8f8f; font-size: 9px; line-height: 1.6; white-space: nowrap; }
+.creation-dialog .pattern-support-hint { margin: -4px 0 16px; }
 .creation-count-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 23px; }
 .creation-count-row > div:first-child { min-width: 125px; flex: 1; }
 .creation-count-row label { display: block; font-size: 12px; color: #626262; font-weight: 500; }

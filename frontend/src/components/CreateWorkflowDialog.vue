@@ -17,12 +17,14 @@
                 <fieldset class="form-group pattern-fieldset" :disabled="creating">
                   <legend>协作模式 <span class="required-mark">*</span></legend>
                   <div class="pattern-options">
-                    <label v-for="pattern in patterns" :key="pattern.value" class="pattern-option" :class="{ selected: form.pattern === pattern.value }">
-                      <input v-model="form.pattern" type="radio" :value="pattern.value" name="pattern" />
-                      <AppIcon :name="pattern.icon" :size="18" /><div class="pattern-details"><span class="pattern-name">{{ pattern.label }}</span><span class="pattern-desc">{{ pattern.description }}</span></div>
-                      <span class="radio-indicator"><span></span></span>
+                    <label v-for="pattern in patterns" :key="pattern.value" class="pattern-option" :class="{ selected: form.pattern === pattern.value, 'is-disabled': !pattern.supported }" :title="pattern.supported ? pattern.description : pattern.reason">
+                      <input v-model="form.pattern" type="radio" :value="pattern.value" name="pattern" :disabled="creating || !pattern.supported" />
+                      <AppIcon :name="pattern.icon" :size="18" /><div class="pattern-details"><span class="pattern-name">{{ pattern.label }}</span><span class="pattern-desc">{{ pattern.supported ? pattern.description : pattern.reason }}</span></div>
+                      <span v-if="!pattern.supported" class="pattern-unsupported">暂不支持</span>
+                      <span v-else class="radio-indicator"><span></span></span>
                     </label>
                   </div>
+                  <p class="hint pattern-support-hint">当前后端仅支持顺序执行与并行执行，其他协作模式暂不可创建。</p>
                 </fieldset>
                 <div class="form-group creation-count-row">
                   <div><label for="agentCount">智能体数量</label><p class="hint">按任务分工，配置 1–10 个智能体</p></div>
@@ -84,7 +86,7 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import AppIcon from './AppIcon.vue'
 import AppSelect from './AppSelect.vue'
-import { providerOptions, modelOptions } from '../utils/workflowOptions'
+import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, unsupportedPatternReason } from '../utils/workflowOptions'
 import { useWorkflowStore } from '../stores/workflow'
 import { workflowService } from '../services/workflow'
 import { validateConnection, formatExecutionError } from '../utils/connection.js'
@@ -94,7 +96,7 @@ const emit = defineEmits(['update:modelValue', 'created'])
 const workflowStore = useWorkflowStore()
 const defaults = () => {
   const provider = props.preset?.llmProvider || 'openai'
-  return { name: '', description: '', pattern: 'sequential', agentCount: 3, ...props.preset, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
+  return { name: '', description: '', agentCount: 3, ...props.preset, pattern: normalizeCreationPattern(props.preset?.pattern), llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
 }
 const form = ref(defaults())
 const creating = ref(false)
@@ -108,16 +110,11 @@ let disposed = false
 
 const availableModels = computed(() => modelOptions[form.value.llmProvider] || [])
 const selectedModel = computed(() => availableModels.value.find(model => model.value === form.value.model))
-const patterns = [
-  { value: 'sequential', label: '顺序执行', icon: 'arrow', description: '依次推进任务' },
-  { value: 'parallel', label: '并行执行', icon: 'parallel', description: '同时分工协作' },
-  { value: 'hierarchical', label: '层次协作', icon: 'hierarchy', description: '统筹与分层执行' },
-  { value: 'debate', label: '辩论模式', icon: 'message', description: '讨论并汇聚共识' },
-]
+const patterns = creationPatterns
 const selectedPattern = computed(() => patterns.find(pattern => pattern.value === form.value.pattern) || patterns[0])
 const validCount = computed(() => Number.isInteger(form.value.agentCount) && form.value.agentCount >= 1 && form.value.agentCount <= 10)
 const connectionError = computed(() => validateConnection(form.value.llmProvider, form.value.apiKey))
-const isValid = computed(() => Boolean(form.value.name.trim() && patterns.some(pattern => pattern.value === form.value.pattern) && validCount.value && selectedModel.value && !connectionError.value))
+const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && selectedModel.value && !connectionError.value))
 
 watch(() => form.value.llmProvider, provider => { form.value.model = modelOptions[provider]?.[0]?.value || '' })
 watch(() => props.modelValue, async open => {
@@ -156,7 +153,7 @@ async function create() {
   errorMessage.value = ''
   try {
     const result = await workflowService.createWorkflow({
-      name: form.value.name.trim(), description: form.value.description, pattern: form.value.pattern,
+      name: form.value.name.trim(), description: form.value.description, pattern: normalizeCreationPattern(form.value.pattern),
       config: { agent_count: form.value.agentCount, llm_provider: form.value.llmProvider, api_key: form.value.apiKey.trim(), model: form.value.model || undefined },
     })
     if (disposed) return
@@ -167,7 +164,11 @@ async function create() {
   } catch (error) {
     if (disposed) return
     const detail = error.response?.data?.detail
-    errorMessage.value = typeof detail === 'string' ? formatExecutionError(detail) : error.response ? '创建失败，请检查填写内容后重试。' : '暂时无法连接服务，请确认后端已启动后重试。'
+    if (typeof detail === 'string' && /not supported/i.test(detail)) {
+      errorMessage.value = unsupportedPatternReason
+    } else {
+      errorMessage.value = typeof detail === 'string' ? formatExecutionError(detail) : error.response ? '创建失败，请检查填写内容后重试。' : '暂时无法连接服务，请确认后端已启动后重试。'
+    }
   } finally { creating.value = false }
 }
 onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.style.overflow = previousOverflow })

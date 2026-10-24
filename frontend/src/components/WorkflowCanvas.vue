@@ -44,7 +44,7 @@ const edges = ref([])
 const { zoomIn, zoomOut, zoomTo, fitView, viewport, dimensions } = useVueFlow('agent-workspace')
 let resizeTimer
 const roleLabels = { coordinator: '协调者', worker: '创作执行', reviewer: '质量审核', specialist: '领域专家' }
-const statusLabels = { idle: '就绪', running: '运行中', waiting: '等待中', completed: '已完成', error: '异常', paused: '已暂停' }
+const statusLabels = { idle: '就绪', running: '运行中', waiting: '等待中', completed: '已完成', error: '异常', paused: '已暂停', unavailable: '需要 API Key' }
 const motion = () => ({ duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260 })
 function fit() { return fitView({ padding: 0.18, maxZoom: 1, ...motion() }) }
 // Fit only after Vue Flow has measured the final container size.
