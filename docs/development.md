@@ -32,11 +32,83 @@ npm run dev -- --host 127.0.0.1 --strictPort
 
 ## 后端组织
 
-- `agentflow/core/`：Agent、Message 和 WorkflowExecutor。
+- `agentflow/core/`：Agent、Message、WorkflowExecutor、WorkflowRun/StepResult、WorkflowDefinition。
+- `agentflow/storage/`：SQLite 运行记录与工作流定义（模型、仓储、增量列迁移）。
+- `agentflow/tracing/`：可选的 Langfuse 适配（默认关闭，默认不采集内容）。
 - `agentflow/agents/`：LLM Agent。
 - `agentflow/adapters/`：模型接口与工厂。
 - `agentflow/api/`：路由和 WebSocket 连接管理。
-- `tests/test_api.py`：无需真实密钥的 API 测试。
+- `tests/`：假适配器机制回归；`test_api.py` 覆盖无真实密钥的 API 路径。
+
+### 运行记录
+
+- 每次执行生成独立 `run_id`；记录格式 `schema_version=3`（步骤输入输出、模型、状态、错误类型、尝试次数、时间、用量类型；run 含 `trace_id`）。
+- 默认数据库 `backend/agentflow_data.db`，可用环境变量 `AGENTFLOW_DB_PATH` 覆盖；旧库启动时自动补齐新列。
+- 历史回看接口只读本地库，不调用模型：`GET /api/workflows/{id}/runs`、`GET /api/runs/{run_id}`、`GET /api/runs/compare?run_ids=...`。
+- 同一工作流并发执行会被拒绝（409）。
+- 写入通过 `asyncio.to_thread` 移出事件循环，并在仓储层串行化；运行结束后按保留策略清理旧记录。
+
+### 执行控制
+
+| 环境变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `AGENTFLOW_STEP_TIMEOUT_SECONDS` | `0` | 单步超时秒数；0 不启用 |
+| `AGENTFLOW_MAX_ATTEMPTS` | `1` | 单步最大尝试次数（1-5）；仅超时/限流/网络/服务端错误重试 |
+| `AGENTFLOW_RECORD_TEXT_LIMIT` | `20000` | 单步输入/输出落库截断长度；0 不截断 |
+| `AGENTFLOW_MAX_RUNS` | `1000` | 最多保留运行记录条数；0 不限制 |
+| `AGENTFLOW_RUN_RETENTION_DAYS` | `0` | 运行记录保留天数；0 不按时间清理 |
+
+- 错误分类写入 `step.error_type`：`timeout/rate_limit/auth/network/server/validation/provider/cancelled/unknown`。
+- 多次尝试的用量按已知部分累计：全部已知为 `actual`，部分未知为 `partial`，全未知为 `unknown`；不会把未知当 0。
+- 记录中的错误文本会做保守脱敏（API Key/Token 等）。
+
+### 可选 API Token
+
+- 设置 `AGENTFLOW_API_TOKEN` 后，所有 `/api/*` 请求需要 `Authorization: Bearer <token>`；`/health` 与 CORS 预检不受限。
+- 前端在 `frontend/.env` 设置 `VITE_API_TOKEN` 时会自动附带该头；**VITE 变量会进入浏览器包**，仅用于本地/受信环境，不建议公网部署。
+
+### 工作流定义持久化与导入导出
+
+- 定义保存在 `workflow_definitions` 表（`definition_json`，`schema_version=1`）；**不保存 API Key/secret/token**。
+- 后端启动时自动恢复定义；恢复的工作流 `requires_credentials=true`，Agent 以配置快照展示（status=unavailable）。
+- 执行恢复的工作流时在请求体里带 `api_key`（只驻留内存，不落库）：`POST /api/workflows/{id}/execute`。
+- 导出：`GET /api/workflows/{id}/definition`；导入：`POST /api/workflows/import`（总会分配新 `workflow_id`）。
+- 删除工作流会同时删除定义；历史运行记录保留。
+- 定义校验/脱敏逻辑在 `agentflow/core/definition.py`（`WorkflowDefinition.from_dict`），导入和数据库读取都经过它。
+
+### Harness²-lite（实验对比）
+
+> 不整体接入 Harness² 框架，只借鉴：配置指纹、执行证据、独立评分、候选对比。设计见
+> [HARNESS2_LITE_PLAN.md](HARNESS2_LITE_PLAN.md)。
+
+- **配置指纹** `agentflow/core/fingerprint.py`：由数据集版本、工作流/Agent 配置、执行策略、scorer、provider 计算 16 位 hash；不含密钥/base_url/时间戳。运行记录 `fingerprint` 字段保存。
+- **执行证据** `agentflow/core/evidence.py`：每 case 一份脱敏 JSON（请求/响应/用量/错误/评分/trace_id/指纹）；默认关闭，实验用 `--evidence` 或 `AGENTFLOW_EVIDENCE_ENABLED=true` 开启；`AGENTFLOW_EVIDENCE_DIR`、保留期 90 天、单文件上限 200KB。
+- **独立评分** `agentflow/core/judge.py`：真实 LLM judge 需 `AGENTFLOW_EXPERIMENT_LLM_JUDGE=1` + 密钥；预算 `AGENTFLOW_JUDGE_MAX_CALLS`（默认 50）；状态区分 scored/judge_disabled/budget_exhausted/scoring_error/missing_score。
+- **数据模型（schema v4）**：`workflow_runs` 增加 experiment_id/candidate_id/case_id/fingerprint/evidence_ref/score/passed/score_status/score_source；新增 `experiments`、`experiment_candidates` 表。
+- **API（只读）**：
+  - `GET /api/experiments`、`GET /api/experiments/{id}`（候选指标 + case×候选矩阵）、`GET /api/experiments/{id}/report`；
+  - `GET /api/evidence/{run_id}`（无证据 404）；
+  - `GET /api/runs?experiment_id=&candidate_id=&fingerprint=&case_id=` 过滤。
+- **报告**：`docs/HARNESS2_COMPARISON.md` + `docs/harness2_results.json`（由 Harness²-lite runner 生成；真实模型需显式门禁，由人工受控执行）。
+
+### 可选的追踪与评估
+
+- `ENABLE_LANGFUSE_TRACING=true` + Langfuse 密钥可开启追踪；默认关闭，导出异常不影响业务。
+- `LANGFUSE_CAPTURE_CONTENT` 默认 `false`：只上传元数据；开启后会脱敏后再上传任务/输入输出。
+- `AUTO_EVALUATE=true` 会在执行后调用评审模型写入评分；会产生少量模型费用。
+
+### 实验与基线
+
+```bash
+cd backend
+python scripts/run_experiment.py --config single --limit 3   # 默认假适配器，输出 JSON
+python scripts/run_experiment.py --config all
+python scripts/run_baseline.py                                # 生成 docs/BASELINE_REPORT.md + baseline_results.json
+```
+
+- 数据集、冻结配置、预期答案分别在 `experiments/*.json`，版本号独立；预期答案不会进入生成模型上下文。
+- 真实模型实验需要 `AGENTFLOW_EXPERIMENT_REAL=1` + `--real` + 对应密钥；默认拒绝，不会联网。
+- 假模型结果只用于验证机制与评分链路，不能代表真实模型质量或成本。
 
 安装为包时会发现所有 `agentflow.*` 子包。可从项目根目录验证 wheel：
 

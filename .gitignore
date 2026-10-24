@@ -28,6 +28,8 @@ htmlcov/
 *.zip
 *.db
 *.sqlite*
+# Harness²-lite 执行证据（本地脱敏记录，可能含业务内容，不入库）
+backend/evidence/
 
 # Editor and OS files
 .idea/

@@ -49,8 +49,11 @@ AgentFlow 将这些工作拆成可检查的组成部分：用 Agent 配置表达
 | `Message` | 表达一次任务或响应，包含发送方、接收方、内容、时间及元数据 |
 | `WorkflowStep` | 指定某一步由哪个 Agent 处理 |
 | `WorkflowConfig` | 将 Agent 配置、执行模式与步骤列表组合成一个工作流 |
-| `WorkflowExecutor` | 注册 Agent、执行步骤、保存消息历史并触发事件回调 |
+| `WorkflowRun` | 一次实际执行的运行记录：run_id、任务输入、配置快照、起止时间、终态、步骤结果与用量 |
+| `StepResult` | 单步记录：步骤序号、Agent、输入输出、模型、状态、错误、时间与用量类型 |
+| `WorkflowExecutor` | 注册 Agent、执行步骤、保存消息历史并触发事件回调；同一时刻只允许一个运行 |
 | 模型适配器 | 将 Agent 的模型请求交给对应服务商，便于将编排逻辑与具体接口分开 |
+| 追踪（可选） | 本地运行记录之外，可通过 Langfuse 观察执行树与评分；默认关闭且默认不上传业务内容 |
 
 以当前已接通的顺序执行为例：
 
@@ -74,7 +77,7 @@ flowchart TD
     ADAPTER --> MODEL[模型服务]
 ```
 
-前端使用 Vue 3、Pinia 和 Vue Flow 展示当前工作流，并轮询后端获取执行状态与消息。后端负责工作流编排和模型调用；Python 开发者也可以直接使用引擎，不必经过网页。当前网页数据来自 API 创建的内存工作流，独立 Python 脚本中的执行器不会自动出现在网页画布上。
+前端使用 Vue 3、Pinia 和 Vue Flow 展示当前工作流，并轮询后端获取执行状态与消息。后端负责工作流编排和模型调用；Python 开发者也可以直接使用引擎，不必经过网页。网页创建的工作流保存在后端内存中，运行记录保存在本地 SQLite（默认 `backend/agentflow_data.db`），刷新页面或重启后仍可查看历史运行。
 
 ## 为什么易调试？
 
@@ -100,7 +103,10 @@ flowchart TD
 
 这里的“易调试”主要指**输入输出可观察、配置可检查、事件可接入**。目前还不提供完整的断点、单步、执行回放或自动重试系统。
 
-当前稳定使用路径是**顺序执行**。并行、层次、辩论等模式的完成情况，以及暂停、停止、单步控制的限制，见 [当前限制](docs/limitations.md)。
+- **运行记录可回看**：每次执行生成独立 run_id，记录任务输入、配置快照、步骤输入输出、模型、状态、错误、耗时和用量类型；刷新页面后可从「运行历史」重新读取。
+- **失败与停止语义真实**：必需步骤失败会停止后续步骤，失败内容不会作为正常材料继续传递；并行失败会区分全部成功/部分失败/全部失败；停止会阻止后续调用并标记已取消步骤。
+
+当前支持 **顺序执行** 与 **并行执行**；层次、辩论、投票和动态路由尚未实现，创建时会被明确拒绝。其他限制见 [当前限制](docs/limitations.md)。
 
 ## 可视化工作台
 
@@ -111,11 +117,19 @@ flowchart TD
 ## 当前功能
 
 - 智能体画布：拖动、缩放、自动布局、详情检查与专注模式。
-- 工作流创建与执行：任务输入、状态同步、步骤进度、模型错误提示。
+- 工作流创建与执行：任务输入、状态同步、步骤进度、模型错误提示；仅支持顺序/并行模式，其余模式明确标注暂不支持。
+- 工作流定义持久化：重启后端后定义自动恢复；密钥不落库，恢复的工作流需要重新输入 API Key 才能执行。
+- 定义导入/导出：可导出工作流定义为版本化 JSON，或导入定义生成新工作流（导入后同样需要提供密钥）。
+- 运行历史：每次执行独立 run_id，可查看状态、步骤输入输出、模型、token、尝试次数、错误类型与 trace_id；支持按状态筛选与导出 JSON；刷新页面后从本地记录重新读取。
+- 停止执行：执行中可直接「停止运行」；顺序模式阻止后续步骤，并行模式取消未完成调用；stopped 不会显示成成功。
+- 执行控制：可选单步超时与有限重试（默认关闭/1 次，仅超时/限流/网络/服务端错误重试）；多次尝试用量按已知部分累计。
 - 工作流删除：二次确认、运行中拦截、清理对应消息与本地选择。
 - 消息时间线：拖动底边调整高度、键盘微调、双击恢复与高度记忆。
 - 模型连接：提供商选择、OpenRouter 密钥匹配检查。
 - 本地编排示例：不调用真实模型，便于先体验界面。
+- 可选追踪与评分：Langfuse 默认关闭；开启后可查看调用树，并可选择自动评估写入评分（默认不外发业务内容）。
+- 实验对比（Harness²-lite）：固定数据集下比较不同候选配置，记录配置指纹、脱敏执行证据、独立 judge 结果，并在「实验对比」面板查看候选表/case 矩阵/证据；不自动改工作流。
+- 可选本地 API Token：设置 `AGENTFLOW_API_TOKEN` 后 /api 请求需 Bearer Token；默认不启用，仅适合本地/受信环境。
 
 ## 两种使用方式
 
@@ -204,7 +218,7 @@ python scripts/dev.py --backend-port 8002 --frontend-port 5176
 
 在页面创建工作流时输入提供商对应的 API Key。使用 OpenRouter 密钥时选择 **OpenRouter**；模型 ID 也应使用该平台支持的格式。
 
-密钥只用于当前后端进程中的模型调用，不写入 Git、浏览器持久存储或配置示例。后端目前使用内存保存工作流与密钥，重启后需重新创建工作流；不要将当前无鉴权的后端直接部署到公网。
+密钥只用于当前后端进程中的模型调用，不写入 Git、浏览器持久存储、运行记录或 Langfuse。工作流定义持久化在本地 SQLite（不含密钥），后端重启后定义会恢复，但执行恢复的工作流时需要在页面重新输入 API Key；不要将当前无鉴权的后端直接部署到公网。
 
 前端 API 地址可选配置在 `frontend/.env`，模板见 [frontend/.env.example](frontend/.env.example)。`VITE_` 变量会进入浏览器代码，不能用来存放模型密钥。
 
@@ -224,15 +238,21 @@ python scripts/dev.py --backend-port 8002 --frontend-port 5176
 
 | 能力 | 当前状态 |
 | --- | --- |
-| 顺序工作流 | 已接通创建、执行、步骤状态与消息查看，是推荐的体验路径 |
-| 并行工作流 | 有基础执行实现，完整进度与消息记录仍待完善 |
-| 辩论、投票 | 引擎中存在基础实现；网页与 API 的完整配置链路尚未覆盖，需自行验证 |
-| 层次协作、动态路由 | 尚未形成完整执行能力 |
-| 暂停、停止、单步与失败即停 | 尚未形成完整的执行控制；Agent 错误可能继续传给后续步骤 |
-| 数据保存 | 目前保存在进程内存中，重启后工作流、消息与连接配置会清空 |
-| 团队或公网部署 | 尚无完整鉴权、多用户隔离和持久化，需要进一步开发 |
+| 顺序工作流 | 已接通创建、执行、步骤状态、消息与运行记录；失败即停 |
+| 并行工作流 | 已接通全部成功/部分失败/全部失败/停止取消的记录与状态 |
+| 辩论、投票 | 未实现；API 创建返回 400，引擎拒绝执行 |
+| 层次协作、动态路由 | 未实现，明确拒绝 |
+| 运行实例与记录 | 每次执行独立 run_id；本地 SQLite 持久化，schema v3，刷新后可回看 |
+| 工作流定义 | 本地 SQLite 持久化（schema v1，不含密钥），重启后恢复；支持定义导出/导入 |
+| 执行控制 | 停止按钮/停止接口；可选单步超时与有限重试；错误类型与尝试次数记录；失败不重试鉴权错误 |
+| 密钥与执行 | 密钥只在内存；重启/导入后的工作流执行时需重新提供 API Key |
+| 评测 | 10 个固定 case + 确定性评分 + 一次受控真实模型实验（30 次执行，样本有限，不外推质量结论） |
+| Harness²-lite | 配置指纹、脱敏证据（默认关闭/90 天）、独立 judge（≤50 次/轮）、候选对比报告与前端实验面板；真实实验一次受控运行 |
+| 追踪关联 | Langfuse 可选；run 记录/实验 case 带 trace_id，未启用时为 null |
+| 本地访问控制 | 可选 `AGENTFLOW_API_TOKEN`（Bearer）；默认关闭，不替代生产鉴权 |
+| 团队或公网部署 | 尚无完整鉴权、多用户隔离，需要进一步开发 |
 
-更详细的说明见 [当前限制](docs/limitations.md)。目前适合在本地验证编排思路和调试协作过程，尚不承诺生产环境的可靠执行与数据保存能力。
+更详细的说明见 [当前限制](docs/limitations.md)，第一批优化见 [第一批优化实施报告](docs/BATCH_1_OPTIMIZATION.md)，工作流定义持久化见 [第二批第 1 项报告](docs/BATCH_2_REPORT.md)，第二批其余事项见 [第二批剩余事项报告](docs/BATCH_2B_REPORT.md)，实验数据见 [实验报告](docs/EXPERIMENTS_REPORT.md)。
 
 ## Docker
 
@@ -253,23 +273,39 @@ cd frontend
 npm run lint
 npm test
 npm run build
+
+# 实验入口与基线（默认假模型，不联网、不产生费用）
+cd backend
+python scripts/run_experiment.py --config all
+python scripts/run_baseline.py   # 重新生成 docs/BASELINE_REPORT.md
 ```
 
-前端测试使用 Node 自带测试运行器；后端 API 测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查。
+前端测试使用 Node 自带测试运行器；后端测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查。当前后端测试与基线数字见 [第一批优化实施报告](docs/BATCH_1_OPTIMIZATION.md) 与 [基线报告](docs/BASELINE_REPORT.md)。
 
 ## 项目结构
 
 ```text
-backend/              FastAPI、工作流引擎、模型适配器与 API 测试
+backend/              FastAPI、工作流引擎、模型适配器、本地运行记录与 API 测试
 frontend/             Vue 3、Vite、Pinia、Vue Flow 与前端回归测试
 examples/             Python API 使用示例
-scripts/              跨平台启动与上传前检查
-docs/                 开发、限制、整理说明和 GitHub 上传指南
+experiments/          固定数据集、冻结配置、预期答案与评分规则（版本化）
+scripts/              跨平台启动、实验运行器与上传前检查
+docs/                 开发、限制、基线与整理说明
 .github/workflows/    自动检查
 ```
 
 - [开发指南](docs/development.md)
 - [当前限制](docs/limitations.md)
+- [第一批优化实施报告](docs/BATCH_1_OPTIMIZATION.md)
+- [第二批第 1 项：工作流定义持久化与导入导出](docs/BATCH_2_REPORT.md)
+- [第二批剩余事项（执行控制/评测/关联/存储/安全/前端）](docs/BATCH_2B_REPORT.md)
+- [实验报告](docs/EXPERIMENTS_REPORT.md)
+- [Harness²-lite 实施报告](docs/HARNESS2_LITE_REPORT.md)
+- [Harness²-lite 设计/决策清单](docs/HARNESS2_LITE_PLAN.md)
+- [Harness²-lite 假模型对比](docs/HARNESS2_COMPARISON.md)
+- [Harness²-lite 真实模型对比（一次受控）](docs/HARNESS2_REAL_COMPARISON.md)
+- [基线报告](docs/BASELINE_REPORT.md)
+- [Langfuse 追踪说明](README_LANGFUSE.md)
 - [上传 GitHub](docs/github.md)
 - [本次整理说明](docs/cleanup.md)
 

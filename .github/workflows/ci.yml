@@ -26,7 +26,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install -e "./backend[dev]"
+      # tracing extra 提供 langfuse；测试默认关闭追踪、不联网
+      - run: python -m pip install -e "./backend[dev,tracing]"
       - run: python -m pytest backend/tests -q
+      # 确定性假模型实验冒烟：不联网、不调用付费模型
+      - run: python scripts/run_experiment.py --config single --limit 2 --output /tmp/experiment_smoke.json
+        working-directory: backend
       - run: python -m pip wheel --no-deps ./backend -w .artifacts
       - run: python scripts/check_repo.py
