@@ -94,6 +94,16 @@ class Agent(ABC):
         """清空记忆"""
         self.memory.clear()
 
+    def reset_for_run(self):
+        """为一次新的运行重置记忆与统计。
+
+        Agent 对象会被同一工作流的多次运行复用；如果只清记忆而保留
+        messages_processed / total_tokens，重复执行会累积旧统计。延续会话必须
+        由调用方显式恢复上下文，不能依赖对象复用隐式发生。
+        """
+        self.memory.clear()
+        self.state = AgentState()
+
     def get_state(self) -> Dict[str, Any]:
         """获取当前状态"""
         return {

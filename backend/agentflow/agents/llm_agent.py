@@ -33,7 +33,7 @@ class LLMAgent(Agent):
             "content": self.config.system_prompt
         })
 
-        # 添加历史上下文（最近几条）
+        # 添加历史上下文（最近几条，不包含当前消息）
         for mem in self.get_context(limit=5):
             if mem.sender == self.name:
                 messages.append({
@@ -62,12 +62,15 @@ class LLMAgent(Agent):
             current_message=message.id
         )
 
-        # 记录到记忆
-        self.add_to_memory(message)
+        # 注意：先构建消息再记录，避免当前消息重复进入上下文
+        # 记录到记忆在返回响应前完成
 
         try:
-            # 构建消息
+            # 构建消息（此时 memory 中还没有当前消息）
             messages = self._build_messages(message)
+
+            # 现在记录输入消息到记忆
+            self.add_to_memory(message)
 
             # 调用 LLM
             start_time = time.time()
@@ -79,6 +82,10 @@ class LLMAgent(Agent):
             )
             duration = time.time() - start_time
 
+            # 提取用量信息
+            usage = response_data.get("usage", {})
+            total_tokens = usage.get("total_tokens", 0)
+
             # 创建响应消息
             response = Message(
                 sender=self.name,
@@ -86,8 +93,9 @@ class LLMAgent(Agent):
                 content=response_data["content"],
                 message_type=MessageType.RESPONSE,
                 metadata={
-                    "model": response_data["model"],
-                    "usage": response_data["usage"],
+                    "model": response_data.get("model"),
+                    "usage": usage,
+                    "finish_reason": response_data.get("finish_reason"),
                     "duration": duration,
                 },
                 parent_id=message.id,
@@ -98,7 +106,7 @@ class LLMAgent(Agent):
 
             # 更新统计
             self.state.messages_processed += 1
-            self.state.total_tokens += response_data["usage"]["total_tokens"]
+            self.state.total_tokens += total_tokens
             self.state.total_time += duration
             self.update_state(status="completed")
 
@@ -106,15 +114,16 @@ class LLMAgent(Agent):
 
         except Exception as e:
             # 错误处理
-            self.state.errors.append(str(e))
+            error_msg = str(e)
+            self.state.errors.append(error_msg)
             self.update_state(status="error")
 
-            # 返回错误消息
+            # 返回错误消息，标记为错误
             return Message(
                 sender=self.name,
                 receiver=message.sender,
-                content=f"Error: {str(e)}",
+                content=f"Error: {error_msg}",
                 message_type=MessageType.RESPONSE,
-                metadata={"error": True},
+                metadata={"error": True, "error_message": error_msg},
                 parent_id=message.id,
             )
