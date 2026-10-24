@@ -5,11 +5,12 @@
  * 目的只是尽早给出中文提示，最终仍以后端校验为准。
  * 定义里永远不应该出现密钥；清洗函数只移除字段，不会打印字段值。
  */
-import { isSupportedWorkflowPattern, unsupportedPatternReason, workflowPatternLabels } from './workflowOptions.js'
+import { isSupportedWorkflowPattern, supportedWorkflowPatterns, minAgentsForPattern, workflowPatternLabels } from './workflowOptions.js'
 
 export const DEFINITION_SCHEMA_VERSION = 1
 
-const MAX_AGENTS = 100
+// 与后端 validate_pattern_agents 保持一致：创建/导入最多 10 个 agent
+const MAX_AGENTS = 10
 const MAX_STEPS = 100
 const MAX_SECRET_PATHS = 20
 
@@ -97,11 +98,15 @@ export function parseWorkflowDefinition(rawText) {
 
   const pattern = text(definition.pattern).trim() || 'sequential'
   if (!isSupportedWorkflowPattern(pattern)) {
-    return failure(`协作模式 ${pattern} 暂不支持：${unsupportedPatternReason}。`)
+    return failure(`未知的协作模式 ${pattern}，支持：${supportedWorkflowPatterns.join(' / ')}。`)
   }
 
   if (!Array.isArray(definition.agents) || !definition.agents.length) return failure('agents 必须是非空数组。')
   if (definition.agents.length > MAX_AGENTS) return failure(`agents 数量过多（最多 ${MAX_AGENTS} 个）。`)
+  const minimumAgents = minAgentsForPattern(pattern)
+  if (definition.agents.length < minimumAgents) {
+    return failure(`协作模式 ${workflowPatternLabels[pattern] || pattern} 至少需要 ${minimumAgents} 个智能体，当前定义只有 ${definition.agents.length} 个。`)
+  }
   if (!Array.isArray(definition.steps) || !definition.steps.length) return failure('steps 必须是非空数组。')
   if (definition.steps.length > MAX_STEPS) return failure(`steps 数量过多（最多 ${MAX_STEPS} 个）。`)
 

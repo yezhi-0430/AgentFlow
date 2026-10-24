@@ -49,7 +49,8 @@
 - `sequential`：2 个 Agent 串行（`drafter` → `reviewer`），`engine_pattern=sequential`，最终输出为复核后的答案。
 - `parallel`：2 个 Agent 并行独立作答，`engine_pattern=parallel`，聚合文本（`aggregated`）用于评分。
 
-配置中只出现引擎实际支持的模式（`sequential` / `parallel`）；debate/voting 等未实现模式不会进入实验配置。
+本目录的固定实验配置仍只使用 `sequential` / `parallel` 两种引擎模式；产品已支持
+hierarchical / debate / voting / dynamic，但这些模式尚未纳入本实验数据集。
 
 ## 使用
 

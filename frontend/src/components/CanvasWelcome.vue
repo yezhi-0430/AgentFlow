@@ -23,7 +23,7 @@
           <AppIcon class="starter-arrow" name="arrow" :size="17" />
         </button>
       </div>
-      <div class="welcome-footnote"><AppIcon name="check" :size="13" /><span>支持顺序、并行、层次与辩论协作</span><span class="welcome-footnote-divider"></span><span>示例无需连接模型</span></div>
+      <div class="welcome-footnote"><AppIcon name="check" :size="13" /><span>支持顺序、并行、层次、辩论、投票与动态协作</span><span class="welcome-footnote-divider"></span><span>示例无需连接模型</span></div>
     </div>
   </div>
 </template>

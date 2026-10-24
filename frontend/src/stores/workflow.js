@@ -254,7 +254,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
           status.value = 'idle'
           waitingForStart = false
         } else if (httpStatus === 400 && typeof detail === 'string' && /not supported/i.test(detail)) {
-          executionError.value = '该协作模式暂不支持，请重新创建顺序执行或并行执行的工作流。'
+          executionError.value = '后端未接受该协作模式，请确认后端版本并重新创建工作流。'
           status.value = 'error'
         } else {
           executionError.value = formatExecutionError(errorText(error))

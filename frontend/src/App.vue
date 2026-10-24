@@ -124,6 +124,7 @@ import { useTimelineResize } from './composables/useTimelineResize.js'
 import { isTerminalExecutionStatus } from './utils/runStatus.js'
 import { definitionFileName, serializeDefinition } from './utils/workflowDefinition.js'
 import { saveDefinitionText } from './utils/definitionTransfer.js'
+import { workflowPatternLabels } from './utils/workflowOptions.js'
 
 const workflowStore = useWorkflowStore()
 const messageStore = useMessageStore()
@@ -139,8 +140,7 @@ const toast = ref(null)
 const confirm = ref(null)
 const historyPanel = ref(null)
 const { height: timelineHeight, minHeight: timelineMinHeight, maxHeight: timelineMaxHeight, resizing: timelineResizing, beginResize: beginTimelineResize, moveResize: moveTimelineResize, endResize: endTimelineResize, onResizeKey: onTimelineResizeKey, resetHeight: resetTimelineHeight, fitViewport: fitTimelineViewport } = useTimelineResize()
-const patternLabels = { sequential: '顺序执行', parallel: '并行执行', hierarchical: '层次协作', debate: '辩论模式' }
-const patternName = computed(() => patternLabels[workflowStore.currentWorkflow?.pattern] || '未设置模式')
+const patternName = computed(() => workflowPatternLabels[workflowStore.currentWorkflow?.pattern] || '未设置模式')
 
 function handleShortcut(event) {
   if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return

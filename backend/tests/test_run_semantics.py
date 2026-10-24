@@ -507,12 +507,12 @@ def api_client(monkeypatch):
     workflow_routes.workflows.clear()
 
 
-def _create_api_workflow(client, pattern="sequential", name="API run semantics"):
+def _create_api_workflow(client, pattern="sequential", name="API run semantics", agent_count=2):
     response = client.post("/api/workflows", json={
         "name": name,
         "pattern": pattern,
         "config": {
-            "agent_count": 2,
+            "agent_count": agent_count,
             "llm_provider": "openai",
             "api_key": "test-only-not-a-real-key",
             "model": "test-model",
@@ -542,15 +542,49 @@ def test_api_execute_returns_run_id_and_status(api_client):
     assert body["step_results"][0]["output_text"].startswith("out-")
 
 
-def test_api_rejects_unsupported_pattern(api_client):
-    response = api_client.post("/api/workflows", json={
-        "name": "unsupported",
-        "pattern": "hierarchical",
+def test_api_supports_all_patterns_and_enforces_minimum_agents(api_client):
+    for pattern, count in (
+        ("hierarchical", 2),
+        ("debate", 3),
+        ("voting", 3),
+        ("dynamic", 2),
+    ):
+        response = api_client.post("/api/workflows", json={
+            "name": f"pattern-{pattern}",
+            "pattern": pattern,
+            "config": {"agent_count": count, "llm_provider": "openai",
+                       "api_key": "test-only", "model": "test-model"},
+        })
+        assert response.status_code == 200, response.text
+        assert response.json()["pattern"] == pattern
+
+    too_few = api_client.post("/api/workflows", json={
+        "name": "bad-debate",
+        "pattern": "debate",
         "config": {"agent_count": 2, "llm_provider": "openai",
                    "api_key": "test-only", "model": "test-model"},
     })
-    assert response.status_code == 400
-    assert "not supported" in response.json()["detail"]
+    assert too_few.status_code == 400
+    assert "at least 3" in too_few.json()["detail"]
+
+
+def test_api_executes_all_six_patterns(api_client):
+    cases = [
+        ("sequential", 2, "completed"),
+        ("parallel", 2, "completed"),
+        ("hierarchical", 3, "completed"),
+        ("debate", 3, "completed"),
+        ("voting", 3, "completed"),
+        ("dynamic", 3, "partial"),
+    ]
+    for pattern, count, expected in cases:
+        workflow_id = _create_api_workflow(api_client, pattern=pattern, agent_count=count,
+                                           name=f"pattern-{pattern}")
+        response = api_client.post(f"/api/workflows/{workflow_id}/execute", json={"task": "api task"})
+        assert response.status_code == 200, (pattern, response.text)
+        status = api_client.get(f"/api/workflows/{workflow_id}/status").json()
+        assert status["status"] == expected, (pattern, status)
+        assert status["pattern"] == pattern
 
 
 def test_api_rejects_second_concurrent_execute(api_client):

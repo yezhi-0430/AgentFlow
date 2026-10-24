@@ -31,6 +31,7 @@ from agentflow.core.workflow import (
     WorkflowPattern,
     WorkflowStep,
     ensure_supported_pattern,
+    validate_pattern_agents,
 )
 
 try:  # 定义持久化是可选的：缺少依赖时不影响内存工作流
@@ -198,11 +199,90 @@ async def get_providers():
     return {"providers": AdapterFactory.get_provider_info()}
 
 
+def _build_pattern_agents(
+    pattern: WorkflowPattern, agent_count: int, model: str
+) -> tuple[List[AgentConfig], List[WorkflowStep]]:
+    """按协作模式生成 Agent 配置与展示用步骤（密钥不进入配置）。"""
+    agents: List[AgentConfig] = []
+    steps: List[WorkflowStep] = []
+
+    def agent(name: str, role: AgentRole, prompt: str) -> AgentConfig:
+        return AgentConfig(
+            name=name, role=role, system_prompt=prompt, model=model,
+            temperature=0.7, max_tokens=2000,
+        )
+
+    if pattern in (WorkflowPattern.SEQUENTIAL, WorkflowPattern.PARALLEL):
+        for index in range(agent_count):
+            name = f"worker_{index + 1}"
+            agents.append(agent(
+                name, AgentRole.WORKER,
+                f"You are worker {index + 1}. Complete the task assigned to you.",
+            ))
+            steps.append(WorkflowStep(
+                id=f"step_{index + 1}", agent_name=name,
+                input_from=f"step_{index}" if pattern == WorkflowPattern.SEQUENTIAL and index > 0 else None,
+            ))
+        return agents, steps
+
+    if pattern in (WorkflowPattern.HIERARCHICAL, WorkflowPattern.DYNAMIC):
+        agents.append(agent(
+            "coordinator", AgentRole.COORDINATOR,
+            "You are the coordinator. Break the task into subtasks, assign work, "
+            "and synthesize the final answer.",
+        ))
+        for index in range(agent_count - 1):
+            name = f"worker_{index + 1}"
+            agents.append(agent(
+                name, AgentRole.WORKER,
+                f"You are worker {index + 1}. Complete the subtask assigned by the coordinator.",
+            ))
+            steps.append(WorkflowStep(id=f"worker_{index + 1}", agent_name=name))
+        if pattern == WorkflowPattern.HIERARCHICAL:
+            steps.insert(0, WorkflowStep(id="plan", agent_name="coordinator"))
+            steps.append(WorkflowStep(id="synthesis", agent_name="coordinator"))
+        else:
+            steps.insert(0, WorkflowStep(id="dynamic_orchestration", agent_name="coordinator"))
+        return agents, steps
+
+    # debate / voting：前 n-1 个是辩手/候选，最后一个是裁判
+    judge_name = "judge"
+    if pattern == WorkflowPattern.DEBATE:
+        for index in range(agent_count - 1):
+            name = f"debater_{index + 1}"
+            agents.append(agent(
+                name, AgentRole.WORKER,
+                f"You are debater {index + 1}. State your position, respond to others, "
+                "and revise toward a correct answer.",
+            ))
+            steps.append(WorkflowStep(id=f"debate_r1_{name}", agent_name=name))
+            steps.append(WorkflowStep(id=f"debate_r2_{name}", agent_name=name))
+    else:
+        for index in range(agent_count - 1):
+            name = f"candidate_{index + 1}"
+            agents.append(agent(
+                name, AgentRole.WORKER,
+                f"You are candidate {index + 1}. Solve the task independently.",
+            ))
+            steps.append(WorkflowStep(id=f"candidate_{name}", agent_name=name))
+
+    agents.append(agent(
+        judge_name, AgentRole.REVIEWER,
+        "You are the judge. Compare the answers and give the final answer.",
+    ))
+    steps.append(WorkflowStep(id="judge", agent_name=judge_name))
+    return agents, steps
+
+
 @router.post("")
 async def create_workflow(request: WorkflowCreateRequest):
     """创建工作流（定义持久化，密钥不落库）"""
     try:
         agent_count = request.config.get("agent_count", 3)
+        try:
+            agent_count = int(agent_count)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="agent_count must be an integer")
         llm_provider = request.config.get("llm_provider", "openai")
         api_key = request.config.get("api_key", "")
         base_url = request.config.get("base_url")
@@ -232,42 +312,11 @@ async def create_workflow(request: WorkflowCreateRequest):
             )
         try:
             ensure_supported_pattern(pattern)
-        except UnsupportedPatternError as e:
+            validate_pattern_agents(pattern, agent_count)
+        except (UnsupportedPatternError, ValueError) as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-        agent_configs: List[AgentConfig] = []
-        workflow_steps: List[WorkflowStep] = []
-
-        if pattern == WorkflowPattern.SEQUENTIAL:
-            for i in range(agent_count):
-                agent_configs.append(AgentConfig(
-                    name=f"worker_{i+1}",
-                    role=AgentRole.WORKER,
-                    system_prompt=f"You are worker {i+1}. Complete the task assigned to you.",
-                    model=model,
-                    temperature=0.7,
-                    max_tokens=2000,
-                ))
-                workflow_steps.append(WorkflowStep(
-                    id=f"step_{i+1}",
-                    agent_name=f"worker_{i+1}",
-                    input_from=f"step_{i}" if i > 0 else None,
-                ))
-        else:  # PARALLEL（其它模式已被 ensure_supported_pattern 拒绝）
-            for i in range(agent_count):
-                agent_configs.append(AgentConfig(
-                    name=f"worker_{i+1}",
-                    role=AgentRole.WORKER,
-                    system_prompt=f"You are worker {i+1}. Work on your assigned part of the task.",
-                    model=model,
-                    temperature=0.7,
-                    max_tokens=2000,
-                ))
-                workflow_steps.append(WorkflowStep(
-                    id=f"step_{i+1}",
-                    agent_name=f"worker_{i+1}",
-                    input_from=None,
-                ))
+        agent_configs, workflow_steps = _build_pattern_agents(pattern, agent_count, model)
 
         workflow_config = WorkflowConfig(
             name=request.name,

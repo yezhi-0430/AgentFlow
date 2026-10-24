@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from enum import Enum
 import asyncio
+import json
 import os
 import re
 import time
@@ -38,7 +39,23 @@ except ImportError:
     TRACING_AVAILABLE = False
 
 
-SUPPORTED_PATTERNS = ("sequential", "parallel")
+SUPPORTED_PATTERNS = (
+    "sequential",
+    "parallel",
+    "hierarchical",
+    "debate",
+    "voting",
+    "dynamic",
+)
+# 各模式对智能体数量的最低要求：协调者/裁判需要独立成员
+MIN_AGENTS_BY_PATTERN = {
+    "sequential": 1,
+    "parallel": 1,
+    "hierarchical": 2,
+    "debate": 3,
+    "voting": 3,
+    "dynamic": 2,
+}
 MAX_RUNS_IN_MEMORY = 50
 PARALLEL_STOP_POLL_INTERVAL = 0.05
 TERMINAL_STATUSES = {
@@ -77,6 +94,19 @@ def ensure_supported_pattern(pattern: WorkflowPattern) -> None:
             f"Workflow pattern '{value}' is not supported yet. "
             f"Supported patterns: {', '.join(SUPPORTED_PATTERNS)}"
         )
+
+
+def validate_pattern_agents(pattern: WorkflowPattern, agent_count: int) -> None:
+    """校验模式所需的最低智能体数量。"""
+    value = pattern.value if isinstance(pattern, WorkflowPattern) else str(pattern)
+    minimum = MIN_AGENTS_BY_PATTERN.get(value, 1)
+    if agent_count < minimum:
+        raise ValueError(
+            f"Workflow pattern '{value}' requires at least {minimum} agents "
+            f"(got {agent_count})"
+        )
+    if agent_count > 10:
+        raise ValueError("at most 10 agents are supported")
 
 
 @dataclass
@@ -435,8 +465,18 @@ class WorkflowExecutor:
         try:
             if self.config.pattern == WorkflowPattern.SEQUENTIAL:
                 workflow_result = await self._execute_sequential(initial_task, run, trace)
-            else:
+            elif self.config.pattern == WorkflowPattern.PARALLEL:
                 workflow_result = await self._execute_parallel(initial_task, run, trace)
+            elif self.config.pattern == WorkflowPattern.HIERARCHICAL:
+                workflow_result = await self._execute_hierarchical(initial_task, run, trace)
+            elif self.config.pattern == WorkflowPattern.DEBATE:
+                workflow_result = await self._execute_debate(initial_task, run, trace)
+            elif self.config.pattern == WorkflowPattern.VOTING:
+                workflow_result = await self._execute_voting(initial_task, run, trace)
+            elif self.config.pattern == WorkflowPattern.DYNAMIC:
+                workflow_result = await self._execute_dynamic(initial_task, run, trace)
+            else:  # pragma: no cover - ensure_supported_pattern 已保证不会到这里
+                raise UnsupportedPatternError(f"Unhandled pattern: {self.config.pattern}")
 
             self._finalize_run(run, workflow_result)
             await self._persist_run(run)
@@ -913,6 +953,472 @@ class WorkflowExecutor:
             "cancelled_steps": cancelled_steps,
             "total_steps": len(entries),
             "successful_steps": len(success_results),
+        }
+
+    # -------------------------------------------------- recorded step helper
+    async def _execute_recorded_step(
+        self,
+        *,
+        step: WorkflowStep,
+        agent: Agent,
+        input_text: str,
+        run: WorkflowRun,
+        trace,
+        index: int,
+    ) -> Dict[str, Any]:
+        """执行单个步骤并写记录；供层次/辩论/投票/动态模式复用。
+
+        返回 {ok, content, cancelled, error, error_type}。失败时只记录步骤，
+        run 的终态由调用方决定（例如部分 worker 失败仍可继续汇总）。
+        """
+        if run.should_stop():
+            return {
+                "ok": False, "content": None, "cancelled": True,
+                "error": "stopped by request", "error_type": "cancelled",
+            }
+
+        self.current_step = index + 1
+        step_result = StepResult(
+            step_id=step.id,
+            agent_name=step.agent_name,
+            status=RunStatus.RUNNING,
+            step_index=index,
+            input_text=self._record_text(input_text),
+            started_at=time.time(),
+        )
+        message = Message(
+            sender="system",
+            receiver=step.agent_name,
+            content=input_text,
+            message_type=MessageType.TASK,
+            metadata={"step_id": step.id, "step_index": index, "run_id": run.run_id},
+        )
+        step_result.input_message_id = message.id
+        self.message_history.append(message)
+
+        await self._emit("step_started", {
+            "workflow_id": self.workflow_id,
+            "run_id": run.run_id,
+            "step": step.id,
+            "step_index": index,
+            "agent": step.agent_name,
+            "message": message.to_dict(),
+        })
+        span = self._trace_step(trace, step, index, input_text, agent)
+        step_start = time.time()
+
+        try:
+            outcome = await self._process_with_policy(agent, message, run)
+        except asyncio.CancelledError:
+            step_result.status = RunStatus.CANCELLED
+            step_result.error = "cancelled before completion; provider state unknown"
+            step_result.error_type = "cancelled"
+            step_result.completed_at = time.time()
+            step_result.duration = step_result.completed_at - step_start
+            run.add_step_result(step_result)
+            await self._persist_run(run)
+            raise
+
+        step_result.attempts = outcome["attempts"]
+        step_result.error_type = outcome["error_type"]
+        step_result.usage = outcome["usage"]
+        step_result.usage_type = outcome["usage_type"]
+        step_result.completed_at = time.time()
+        step_result.duration = step_result.completed_at - step_start
+
+        response = outcome.get("response") or outcome.get("last_response")
+        if response is not None:
+            step_result.output_message_id = response.id
+            step_result.output_text = self._record_text(response.content)
+            model, finish_reason = self._extract_response_meta(response)
+            step_result.model = model
+            step_result.finish_reason = finish_reason
+            self.message_history.append(response)
+
+        if outcome["cancelled"]:
+            step_result.status = RunStatus.CANCELLED
+            step_result.error = redact_text(outcome["error"] or "stopped by request")
+            run.add_step_result(step_result)
+            await self._persist_run(run)
+            self._update_span(span, error=step_result.error)
+            await self._emit("step_cancelled", {
+                "workflow_id": self.workflow_id,
+                "run_id": run.run_id,
+                "step": step.id,
+                "agent": step.agent_name,
+            })
+            return {
+                "ok": False, "content": None, "cancelled": True,
+                "error": step_result.error, "error_type": "cancelled",
+            }
+
+        if outcome["error"]:
+            step_result.status = RunStatus.FAILED
+            step_result.error = redact_text(outcome["error"])
+            run.add_step_result(step_result)
+            await self._persist_run(run)
+            self._update_span(span, error=step_result.error)
+            await self._emit("step_failed", {
+                "workflow_id": self.workflow_id,
+                "run_id": run.run_id,
+                "step": step.id,
+                "agent": step.agent_name,
+                "error": step_result.error,
+                "error_type": step_result.error_type,
+                "attempts": step_result.attempts,
+                "duration": step_result.duration,
+            })
+            return {
+                "ok": False, "content": None, "cancelled": False,
+                "error": step_result.error, "error_type": step_result.error_type,
+            }
+
+        step_result.status = RunStatus.COMPLETED
+        run.add_step_result(step_result)
+        await self._persist_run(run)
+        self._update_span(span, output=response.content, usage=outcome["usage"])
+        await self._emit("step_completed", {
+            "workflow_id": self.workflow_id,
+            "run_id": run.run_id,
+            "step": step.id,
+            "agent": step.agent_name,
+            "result": response.content,
+            "duration": step_result.duration,
+            "attempts": step_result.attempts,
+        })
+        return {
+            "ok": True, "content": response.content, "cancelled": False,
+            "error": None, "error_type": None,
+        }
+
+    # ------------------------------------------------------------ hierarchical
+    async def _execute_hierarchical(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
+        """协调者规划 → 工作者依次执行 → 协调者汇总。"""
+        if len(self.config.agents) < 2:
+            raise ValueError("hierarchical pattern requires at least 2 agents")
+
+        coordinator = self.agents.get(self.config.agents[0].name)
+        worker_names = [cfg.name for cfg in self.config.agents[1:]]
+        if coordinator is None or not worker_names:
+            raise ValueError("hierarchical pattern requires a coordinator and workers")
+
+        index = 0
+        plan_input = (
+            f"{task}\n\n[协调者] 请把任务拆解为 {len(worker_names)} 个以内的子任务，"
+            "给出简洁执行计划；不要直接给最终答案。"
+        )
+        plan = await self._execute_recorded_step(
+            step=WorkflowStep(id="plan", agent_name=self.config.agents[0].name),
+            agent=coordinator, input_text=plan_input, run=run, trace=trace, index=index,
+        )
+        index += 1
+        if not plan["ok"]:
+            if not plan["cancelled"]:
+                run.mark_failed(plan["error"] or "coordinator plan failed")
+            return {"final_result": None, "plan": None, "worker_results": []}
+
+        plan_text = plan["content"] or ""
+        worker_results: List[str] = []
+        failed_workers: List[str] = []
+        for worker_name in worker_names:
+            if run.should_stop():
+                break
+            agent = self.agents.get(worker_name)
+            if agent is None:
+                failed_workers.append(worker_name)
+                continue
+            worker_input = (
+                f"{task}\n\n[执行计划]\n{plan_text}\n\n"
+                f"[你的分工] 请执行计划中适合你的部分（工作者：{worker_name}），给出阶段结果。"
+            )
+            outcome = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"worker_{index}", agent_name=worker_name),
+                agent=agent, input_text=worker_input, run=run, trace=trace, index=index,
+            )
+            index += 1
+            if outcome["ok"]:
+                worker_results.append(f"[{worker_name}]\n{outcome['content']}")
+            elif outcome["cancelled"]:
+                break
+            else:
+                failed_workers.append(worker_name)
+
+        if not worker_results:
+            run.mark_failed("all workers failed")
+            return {"final_result": None, "plan": plan_text, "worker_results": []}
+
+        synthesis_input = (
+            f"{task}\n\n[执行计划]\n{plan_text}\n\n[工作者结果]\n"
+            + "\n\n".join(worker_results)
+            + "\n\n[协调者] 请综合以上结果，给出最终答案。"
+        )
+        synthesis = await self._execute_recorded_step(
+            step=WorkflowStep(id="synthesis", agent_name=self.config.agents[0].name),
+            agent=coordinator, input_text=synthesis_input, run=run, trace=trace, index=index,
+        )
+        if not synthesis["ok"]:
+            if not synthesis["cancelled"]:
+                run.mark_failed(synthesis["error"] or "coordinator synthesis failed")
+            return {"final_result": None, "plan": plan_text, "worker_results": worker_results}
+
+        if failed_workers:
+            run.mark_partial("some workers failed")
+        return {
+            "final_result": synthesis["content"],
+            "plan": plan_text,
+            "worker_results": worker_results,
+            "failed_workers": failed_workers,
+        }
+
+    # ------------------------------------------------------------------ debate
+    async def _execute_debate(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
+        """多辩手两轮讨论 → 裁判综合出最终答案。"""
+        if len(self.config.agents) < 3:
+            raise ValueError("debate pattern requires at least 3 agents")
+
+        debater_names = [cfg.name for cfg in self.config.agents[:-1]]
+        judge_name = self.config.agents[-1].name
+        judge = self.agents.get(judge_name)
+        if judge is None:
+            raise ValueError("debate pattern requires a judge agent")
+
+        rounds = max(1, min(2, int(self.config.max_iterations or 2)))
+        index = 0
+        positions: Dict[str, str] = {}
+        failed: List[str] = []
+
+        for round_no in range(1, rounds + 1):
+            for name in debater_names:
+                if run.should_stop():
+                    break
+                agent = self.agents.get(name)
+                if agent is None:
+                    failed.append(name)
+                    continue
+                others = [
+                    f"[{other}]\n{positions[other]}"
+                    for other in debater_names
+                    if other != name and other in positions
+                ]
+                if round_no == 1:
+                    input_text = (
+                        f"{task}\n\n[辩论第 1 轮] 请独立给出你的观点与答案，"
+                        "简洁说明理由。"
+                    )
+                else:
+                    input_text = (
+                        f"{task}\n\n[你的上一轮观点]\n{positions.get(name, '（无）')}\n\n"
+                        f"[其他辩手观点]\n" + ("\n\n".join(others) or "（无）") + "\n\n"
+                        "[第 2 轮] 请回应其他观点、修正自己的立场，并给出最终答案。"
+                    )
+                outcome = await self._execute_recorded_step(
+                    step=WorkflowStep(id=f"debate_r{round_no}_{name}", agent_name=name),
+                    agent=agent, input_text=input_text, run=run, trace=trace, index=index,
+                )
+                index += 1
+                if outcome["ok"]:
+                    positions[name] = outcome["content"] or ""
+                elif outcome["cancelled"]:
+                    break
+                else:
+                    failed.append(name)
+
+        if not positions:
+            run.mark_failed("all debaters failed")
+            return {"final_result": None, "positions": {}}
+
+        judge_input = (
+            f"{task}\n\n[辩手最终观点]\n"
+            + "\n\n".join(f"[{name}]\n{text}" for name, text in positions.items())
+            + "\n\n[裁判] 请综合评判各辩手观点，给出最终答案。"
+        )
+        verdict = await self._execute_recorded_step(
+            step=WorkflowStep(id="judge", agent_name=judge_name),
+            agent=judge, input_text=judge_input, run=run, trace=trace, index=index,
+        )
+        if not verdict["ok"]:
+            if not verdict["cancelled"]:
+                run.mark_failed(verdict["error"] or "judge failed")
+            return {"final_result": None, "positions": positions}
+
+        if failed:
+            run.mark_partial("some debaters failed")
+        return {"final_result": verdict["content"], "positions": positions, "failed_debaters": failed}
+
+    # ------------------------------------------------------------------ voting
+    async def _execute_voting(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
+        """多个候选独立作答 → 裁判比较并裁决出最终答案。"""
+        if len(self.config.agents) < 3:
+            raise ValueError("voting pattern requires at least 3 agents")
+
+        candidate_names = [cfg.name for cfg in self.config.agents[:-1]]
+        judge_name = self.config.agents[-1].name
+        judge = self.agents.get(judge_name)
+        if judge is None:
+            raise ValueError("voting pattern requires a judge agent")
+
+        index = 0
+        candidates: List[str] = []
+        failed: List[str] = []
+        for name in candidate_names:
+            if run.should_stop():
+                break
+            agent = self.agents.get(name)
+            if agent is None:
+                failed.append(name)
+                continue
+            input_text = (
+                f"{task}\n\n[候选方案] 请独立完成任务并给出你的答案；"
+                "不要假设其他候选的存在。"
+            )
+            outcome = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"candidate_{name}", agent_name=name),
+                agent=agent, input_text=input_text, run=run, trace=trace, index=index,
+            )
+            index += 1
+            if outcome["ok"]:
+                candidates.append(f"[{name}]\n{outcome['content']}")
+            elif outcome["cancelled"]:
+                break
+            else:
+                failed.append(name)
+
+        if not candidates:
+            run.mark_failed("all candidates failed")
+            return {"final_result": None, "candidates": []}
+
+        judge_input = (
+            f"{task}\n\n[候选答案]\n" + "\n\n".join(candidates)
+            + "\n\n[裁决] 请比较各候选答案，选出最佳答案并给出最终答复。"
+        )
+        verdict = await self._execute_recorded_step(
+            step=WorkflowStep(id="judge", agent_name=judge_name),
+            agent=judge, input_text=judge_input, run=run, trace=trace, index=index,
+        )
+        if not verdict["ok"]:
+            if not verdict["cancelled"]:
+                run.mark_failed(verdict["error"] or "judge failed")
+            return {"final_result": None, "candidates": candidates}
+
+        if failed:
+            run.mark_partial("some candidates failed")
+        return {"final_result": verdict["content"], "candidates": candidates, "failed_candidates": failed}
+
+    # ----------------------------------------------------------------- dynamic
+    @staticmethod
+    def _parse_dynamic_plan(text: Optional[str]) -> Optional[Dict[str, Any]]:
+        if not text:
+            return None
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:]
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            data = json.loads(cleaned[start:end + 1])
+        except (TypeError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    async def _execute_dynamic(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
+        """协调者逐轮决定下一位工作者，最多 max_iterations 轮，最后汇总。"""
+        if len(self.config.agents) < 2:
+            raise ValueError("dynamic pattern requires at least 2 agents")
+
+        coordinator_name = self.config.agents[0].name
+        worker_names = [cfg.name for cfg in self.config.agents[1:]]
+        coordinator = self.agents.get(coordinator_name)
+        if coordinator is None or not worker_names:
+            raise ValueError("dynamic pattern requires a coordinator and workers")
+
+        max_rounds = max(1, min(10, int(self.config.max_iterations or 10)))
+        index = 0
+        history: List[str] = []
+        failed = False
+        plan_errors = 0
+
+        for round_no in range(1, max_rounds + 1):
+            if run.should_stop():
+                break
+            history_text = "\n\n".join(history) or "（尚无执行记录）"
+            plan_input = (
+                f"{task}\n\n[协调者] 可用工作者：{', '.join(worker_names)}\n"
+                f"[已有执行记录]\n{history_text}\n\n"
+                "请决定下一步：只输出 JSON，不要输出其他文字。格式："
+                '{"done": false, "next": "工作者名", "task": "给该工作者的具体子任务"}；'
+                '如果已经可以结束，输出 {"done": true}。'
+            )
+            plan = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"dynamic_plan_{round_no}", agent_name=coordinator_name),
+                agent=coordinator, input_text=plan_input, run=run, trace=trace, index=index,
+            )
+            index += 1
+            if not plan["ok"]:
+                if not plan["cancelled"]:
+                    run.mark_failed(plan["error"] or "coordinator planning failed")
+                return {"final_result": None, "history": history}
+
+            payload = self._parse_dynamic_plan(plan["content"])
+            if payload is None:
+                plan_errors += 1
+                if round_no == max_rounds:
+                    break
+                next_name = worker_names[0]
+                subtask = plan["content"] or "继续推进任务"
+            else:
+                if payload.get("done") is True:
+                    break
+                next_name = payload.get("next") or payload.get("worker") or worker_names[0]
+                subtask = payload.get("task") or payload.get("subtask") or "继续推进任务"
+                if next_name not in worker_names:
+                    plan_errors += 1
+                    next_name = worker_names[0]
+
+            worker = self.agents.get(next_name)
+            if worker is None:
+                failed = True
+                break
+            worker_input = (
+                f"{task}\n\n[协调者安排的子任务]\n{subtask}\n\n"
+                f"[已有执行记录]\n{history_text}\n\n请完成该子任务并给出结果。"
+            )
+            outcome = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"dynamic_step_{round_no}", agent_name=next_name),
+                agent=worker, input_text=worker_input, run=run, trace=trace, index=index,
+            )
+            index += 1
+            if outcome["ok"]:
+                history.append(f"[{next_name}]\n{outcome['content']}")
+            elif outcome["cancelled"]:
+                break
+            else:
+                failed = True
+                break
+
+        final_input = (
+            f"{task}\n\n[执行记录]\n" + ("\n\n".join(history) or "（无）")
+            + "\n\n[协调者] 请根据以上执行记录给出最终答案。"
+        )
+        final = await self._execute_recorded_step(
+            step=WorkflowStep(id="dynamic_final", agent_name=coordinator_name),
+            agent=coordinator, input_text=final_input, run=run, trace=trace, index=index,
+        )
+        if not final["ok"]:
+            if not final["cancelled"]:
+                run.mark_failed(final["error"] or "coordinator finalization failed")
+            return {"final_result": None, "history": history}
+
+        if failed or plan_errors:
+            run.mark_partial("dynamic execution had fallback/failed steps")
+        return {
+            "final_result": final["content"],
+            "history": history,
+            "rounds": len(history),
+            "plan_errors": plan_errors,
         }
 
     # ------------------------------------------------------------------ helpers

@@ -76,6 +76,24 @@ npm run dev -- --host 127.0.0.1 --strictPort
 - 删除工作流会同时删除定义；历史运行记录保留。
 - 定义校验/脱敏逻辑在 `agentflow/core/definition.py`（`WorkflowDefinition.from_dict`），导入和数据库读取都经过它。
 
+### 协作模式（后端执行语义）
+
+`WorkflowPattern` 支持 6 种模式；创建/导入时按模式自动分配角色与最低智能体数：
+
+| 模式 | 角色分配 | 执行语义 | 最低智能体 |
+| --- | --- | --- | --- |
+| sequential | 全 worker | 按 steps 依次执行，失败即停 | 1 |
+| parallel | 全 worker | 所有步骤并发，记录成功/失败/取消 | 1 |
+| hierarchical | 第 1 个 coordinator + 其余 worker | 协调者规划 → worker 顺序执行 → 协调者汇总 | 2 |
+| debate | 前 n-1 个 debater + 最后 1 个 judge | 两轮辩论（第二轮互看观点）→ 裁判综合 | 3 |
+| voting | 前 n-1 个 candidate + 最后 1 个 judge | 候选独立作答 → 裁判比较裁决 | 3 |
+| dynamic | 第 1 个 coordinator + 其余 worker | 协调者逐轮输出 JSON 选 worker，最多 max_iterations 轮 → 汇总 | 2 |
+
+- 创建 API 会对不足最低数量的请求返回 400；定义导入同样校验。
+- 新增模式复用 `_execute_recorded_step`：步骤记录、超时/重试、停止、token、trace_id 与现有记录格式一致。
+- 动态协调者输出非法 JSON 时回退到第一位 worker，并把运行标记为 partial。
+- 实验脚本的固定配置仍只使用 sequential/parallel，尚未把四种新模式纳入评测数据集。
+
 ### Harness²-lite（实验对比）
 
 > 不整体接入 Harness² 框架，只借鉴：配置指纹、执行证据、独立评分、候选对比。设计见

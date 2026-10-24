@@ -308,20 +308,18 @@ async def test_failed_workflow_ends_trace_with_error_level():
     assert tracer.ended[0]["status_message"] == "boom"
 
 
-def test_unsupported_pattern_is_rejected():
-    """未完成的模式必须显式拒绝，而不是半执行"""
-    from agentflow.core.workflow import (
-        UnsupportedPatternError,
-        WorkflowExecutor,
-        WorkflowPattern,
-    )
+@pytest.mark.asyncio
+async def test_debate_requires_at_least_three_agents():
+    """辩论模式需要至少 2 名辩手 + 1 名裁判，配置不足时必须显式拒绝"""
+    from agentflow.core.workflow import WorkflowExecutor, WorkflowPattern
 
     agent = FakeAgent()
     config = build_config(WorkflowPattern.DEBATE, [("step_1", "worker_1")], [agent])
     config.max_iterations = 1
+    executor = WorkflowExecutor(config, enable_persistence=False, enable_tracing=False)
 
-    with pytest.raises(UnsupportedPatternError):
-        WorkflowExecutor(config, enable_persistence=False, enable_tracing=False)
+    with pytest.raises(ValueError, match="at least 3"):
+        await executor.execute("task")
 
 
 @pytest.mark.asyncio

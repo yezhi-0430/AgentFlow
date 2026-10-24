@@ -17,25 +17,24 @@
                 <fieldset class="form-group pattern-fieldset" :disabled="creating">
                   <legend>协作模式 <span class="required-mark">*</span></legend>
                   <div class="pattern-options">
-                    <label v-for="pattern in patterns" :key="pattern.value" class="pattern-option" :class="{ selected: form.pattern === pattern.value, 'is-disabled': !pattern.supported }" :title="pattern.supported ? pattern.description : pattern.reason">
-                      <input v-model="form.pattern" type="radio" :value="pattern.value" name="pattern" :disabled="creating || !pattern.supported" />
-                      <AppIcon :name="pattern.icon" :size="18" /><div class="pattern-details"><span class="pattern-name">{{ pattern.label }}</span><span class="pattern-desc">{{ pattern.supported ? pattern.description : pattern.reason }}</span></div>
-                      <span v-if="!pattern.supported" class="pattern-unsupported">暂不支持</span>
-                      <span v-else class="radio-indicator"><span></span></span>
+                    <label v-for="pattern in patterns" :key="pattern.value" class="pattern-option" :class="{ selected: form.pattern === pattern.value }" :title="pattern.description">
+                      <input v-model="form.pattern" type="radio" :value="pattern.value" name="pattern" :disabled="creating" />
+                      <AppIcon :name="pattern.icon" :size="18" /><div class="pattern-details"><span class="pattern-name">{{ pattern.label }}</span><span class="pattern-desc">{{ pattern.description }} · {{ pattern.roleHint }}</span></div>
+                      <span class="radio-indicator"><span></span></span>
                     </label>
                   </div>
-                  <p class="hint pattern-support-hint">当前后端仅支持顺序执行与并行执行，其他协作模式暂不可创建。</p>
+                  <p class="hint pattern-support-hint">不同协作模式对团队角色与最少智能体数量有不同要求，切换模式会自动调整数量下限。</p>
                 </fieldset>
                 <div class="form-group creation-count-row">
-                  <div><label for="agentCount">智能体数量</label><p class="hint">按任务分工，配置 1–10 个智能体</p></div>
+                  <div><label for="agentCount">智能体数量</label><p class="hint">按任务分工，配置 {{ minAgentCount }}–{{ MAX_AGENT_COUNT }} 个智能体</p></div>
                   <div class="agent-count-control">
-                    <button class="icon-button" type="button" aria-label="减少智能体数量" :disabled="creating || form.agentCount <= 1" @click="adjustAgents(-1)"><AppIcon name="minus" :size="14" /></button>
-                    <input id="agentCount" v-model.number="form.agentCount" type="number" min="1" max="10" required :disabled="creating" aria-describedby="count-hint" />
-                    <button class="icon-button" type="button" aria-label="增加智能体数量" :disabled="creating || form.agentCount >= 10" @click="adjustAgents(1)"><AppIcon name="plus" :size="14" /></button>
+                    <button class="icon-button" type="button" aria-label="减少智能体数量" :disabled="creating || form.agentCount <= minAgentCount" @click="adjustAgents(-1)"><AppIcon name="minus" :size="14" /></button>
+                    <input id="agentCount" v-model.number="form.agentCount" type="number" :min="minAgentCount" :max="MAX_AGENT_COUNT" required :disabled="creating" aria-describedby="count-hint" />
+                    <button class="icon-button" type="button" aria-label="增加智能体数量" :disabled="creating || form.agentCount >= MAX_AGENT_COUNT" @click="adjustAgents(1)"><AppIcon name="plus" :size="14" /></button>
                   </div>
                 </div>
-                <p v-if="!validCount" id="count-hint" class="creation-inline-error" role="status">请输入 1–10 之间的整数。</p>
-                <span v-else id="count-hint" class="sr-only">数量范围为 1 到 10。</span>
+                <p v-if="countError" id="count-hint" class="creation-inline-error" role="status">{{ countError }}</p>
+                <span v-else id="count-hint" class="sr-only">{{ selectedPattern.label }}最少需要 {{ minAgentCount }} 个智能体，最多 {{ MAX_AGENT_COUNT }} 个。</span>
               </section>
 
               <section class="creation-models" aria-labelledby="model-settings-title">
@@ -86,7 +85,7 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import AppIcon from './AppIcon.vue'
 import AppSelect from './AppSelect.vue'
-import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, unsupportedPatternReason } from '../utils/workflowOptions'
+import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, MAX_AGENT_COUNT, minAgentsForPattern, ensureMinimumAgents, clampAgentCount } from '../utils/workflowOptions'
 import { useWorkflowStore } from '../stores/workflow'
 import { workflowService } from '../services/workflow'
 import { validateConnection, formatExecutionError } from '../utils/connection.js'
@@ -96,7 +95,8 @@ const emit = defineEmits(['update:modelValue', 'created'])
 const workflowStore = useWorkflowStore()
 const defaults = () => {
   const provider = props.preset?.llmProvider || 'openai'
-  return { name: '', description: '', agentCount: 3, ...props.preset, pattern: normalizeCreationPattern(props.preset?.pattern), llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
+  const pattern = normalizeCreationPattern(props.preset?.pattern)
+  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
 }
 const form = ref(defaults())
 const creating = ref(false)
@@ -112,11 +112,20 @@ const availableModels = computed(() => modelOptions[form.value.llmProvider] || [
 const selectedModel = computed(() => availableModels.value.find(model => model.value === form.value.model))
 const patterns = creationPatterns
 const selectedPattern = computed(() => patterns.find(pattern => pattern.value === form.value.pattern) || patterns[0])
-const validCount = computed(() => Number.isInteger(form.value.agentCount) && form.value.agentCount >= 1 && form.value.agentCount <= 10)
+const minAgentCount = computed(() => minAgentsForPattern(form.value.pattern))
+const validCount = computed(() => Number.isInteger(form.value.agentCount) && form.value.agentCount >= minAgentCount.value && form.value.agentCount <= MAX_AGENT_COUNT)
+const countError = computed(() => {
+  const count = form.value.agentCount
+  if (!Number.isInteger(count)) return '请输入整数智能体数量。'
+  if (count < minAgentCount.value) return `${selectedPattern.value.label}至少需要 ${minAgentCount.value} 个智能体。`
+  if (count > MAX_AGENT_COUNT) return `最多支持 ${MAX_AGENT_COUNT} 个智能体。`
+  return ''
+})
 const connectionError = computed(() => validateConnection(form.value.llmProvider, form.value.apiKey))
 const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && selectedModel.value && !connectionError.value))
 
 watch(() => form.value.llmProvider, provider => { form.value.model = modelOptions[provider]?.[0]?.value || '' })
+watch(() => form.value.pattern, pattern => { form.value.agentCount = ensureMinimumAgents(pattern, form.value.agentCount) })
 watch(() => props.modelValue, async open => {
   if (open) {
     previousFocus = document.activeElement
@@ -134,8 +143,8 @@ watch(() => props.modelValue, async open => {
   }
 })
 function adjustAgents(delta) {
-  const count = Number.isInteger(form.value.agentCount) ? form.value.agentCount : 3
-  form.value.agentCount = Math.min(10, Math.max(1, count + delta))
+  const count = Number.isInteger(form.value.agentCount) ? form.value.agentCount : minAgentCount.value
+  form.value.agentCount = clampAgentCount(form.value.pattern, count + delta)
 }
 function restoreFocus() { if (previousFocus?.isConnected) previousFocus.focus() }
 function close() { if (!creating.value) emit('update:modelValue', false) }
@@ -164,11 +173,7 @@ async function create() {
   } catch (error) {
     if (disposed) return
     const detail = error.response?.data?.detail
-    if (typeof detail === 'string' && /not supported/i.test(detail)) {
-      errorMessage.value = unsupportedPatternReason
-    } else {
-      errorMessage.value = typeof detail === 'string' ? formatExecutionError(detail) : error.response ? '创建失败，请检查填写内容后重试。' : '暂时无法连接服务，请确认后端已启动后重试。'
-    }
+    errorMessage.value = typeof detail === 'string' ? formatExecutionError(detail) : error.response ? '创建失败，请检查填写内容后重试。' : '暂时无法连接服务，请确认后端已启动后重试。'
   } finally { creating.value = false }
 }
 onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.style.overflow = previousOverflow })

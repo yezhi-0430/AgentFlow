@@ -33,7 +33,7 @@ _SECRET_FIELD_NAMES = {
 # 连接信息中允许保存的字段（本地配置，不含密钥）
 _ALLOWED_CONNECTION_KEYS = ("provider", "base_url", "site_url", "app_name")
 
-_MAX_AGENTS = 100
+_MAX_AGENTS = 10
 _MAX_STEPS = 100
 _MAX_TEXT = 20000
 
@@ -159,6 +159,10 @@ class WorkflowDefinition:
             for raw in self.steps
         ]
 
+        from agentflow.core.workflow import validate_pattern_agents
+
+        validate_pattern_agents(pattern, len(agents))
+
         return WorkflowConfig(
             name=self.name,
             pattern=pattern,
@@ -175,6 +179,7 @@ class WorkflowDefinition:
             UnsupportedPatternError,
             WorkflowPattern,
             ensure_supported_pattern,
+            validate_pattern_agents,
         )
 
         if not isinstance(data, dict):
@@ -218,6 +223,10 @@ class WorkflowDefinition:
             raise DefinitionValidationError("steps must be a non-empty list")
         if len(agents_raw) > _MAX_AGENTS:
             raise DefinitionValidationError(f"too many agents (>{_MAX_AGENTS})")
+        try:
+            validate_pattern_agents(WorkflowPattern(pattern), len(agents_raw))
+        except ValueError as e:
+            raise DefinitionValidationError(str(e))
         if len(steps_raw) > _MAX_STEPS:
             raise DefinitionValidationError(f"too many steps (>{_MAX_STEPS})")
 

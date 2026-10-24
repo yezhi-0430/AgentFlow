@@ -1,7 +1,18 @@
-// 后端当前只实现 sequential / parallel；其余模式会在创建/执行阶段被拒绝。
-export const supportedWorkflowPatterns = ['sequential', 'parallel']
+// 后端已实现全部六种协作模式，创建、导入与执行阶段均按此列表放行。
+export const supportedWorkflowPatterns = ['sequential', 'parallel', 'hierarchical', 'debate', 'voting', 'dynamic']
 
-export const unsupportedPatternReason = '当前后端暂不支持该协作模式，创建后无法执行'
+/** 创建弹窗与创建接口统一的智能体数量上限。 */
+export const MAX_AGENT_COUNT = 10
+
+/** 各模式的最少智能体数量：协调者/裁判必须是独立成员。 */
+export const MIN_AGENTS_BY_PATTERN = {
+  sequential: 1,
+  parallel: 1,
+  hierarchical: 2,
+  debate: 3,
+  voting: 3,
+  dynamic: 2,
+}
 
 /** 协作模式中文名，用于列表与摘要展示。 */
 export const workflowPatternLabels = {
@@ -14,25 +25,44 @@ export const workflowPatternLabels = {
 }
 
 /**
- * 创建弹窗展示的协作模式。未支持的模式保留展示（合作概念仍然可见），
- * 但必须禁用并给出原因，避免用户创建成功后才在运行时失败。
+ * 创建弹窗展示的协作模式。roleHint 说明该模式的团队角色构成，
+ * minAgents 与后端 validate_pattern_agents 保持一致。
  */
 export const creationPatterns = [
-  { value: 'sequential', label: '顺序执行', icon: 'arrow', description: '依次推进任务', supported: true },
-  { value: 'parallel', label: '并行执行', icon: 'parallel', description: '同时分工协作', supported: true },
-  { value: 'hierarchical', label: '层次协作', icon: 'hierarchy', description: '统筹与分层执行', supported: false, reason: unsupportedPatternReason },
-  { value: 'debate', label: '辩论模式', icon: 'message', description: '讨论并汇聚共识', supported: false, reason: unsupportedPatternReason },
-  { value: 'voting', label: '投票模式', icon: 'check', description: '多智能体投票决策', supported: false, reason: unsupportedPatternReason },
-  { value: 'dynamic', label: '动态协作', icon: 'sliders', description: '运行时动态编排任务', supported: false, reason: unsupportedPatternReason },
+  { value: 'sequential', label: '顺序执行', icon: 'arrow', description: '依次推进任务', roleHint: '全部为工作者', minAgents: 1, supported: true },
+  { value: 'parallel', label: '并行执行', icon: 'parallel', description: '同时分工协作', roleHint: '全部为工作者', minAgents: 1, supported: true },
+  { value: 'hierarchical', label: '层次协作', icon: 'hierarchy', description: '统筹与分层执行', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, supported: true },
+  { value: 'debate', label: '辩论模式', icon: 'message', description: '讨论并汇聚共识', roleHint: '多位辩手 + 1 位裁判', minAgents: 3, supported: true },
+  { value: 'voting', label: '投票模式', icon: 'check', description: '多智能体投票决策', roleHint: '多位候选者 + 1 位裁判', minAgents: 3, supported: true },
+  { value: 'dynamic', label: '动态协作', icon: 'sliders', description: '运行时动态编排任务', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, supported: true },
 ]
 
 export function isSupportedWorkflowPattern(pattern) {
   return supportedWorkflowPatterns.includes(pattern)
 }
 
-/** 预设里若带有未支持的模式，回退到可创建的顺序执行。 */
+/** 预设里若带有未知模式，回退到可创建的顺序执行。 */
 export function normalizeCreationPattern(pattern) {
   return isSupportedWorkflowPattern(pattern) ? pattern : 'sequential'
+}
+
+/** 返回某模式的最少智能体数量；未知模式按顺序执行处理。 */
+export function minAgentsForPattern(pattern) {
+  const minimum = MIN_AGENTS_BY_PATTERN[pattern]
+  return Number.isInteger(minimum) ? minimum : 1
+}
+
+/** 切换模式时把低于下限的数量抬到下限；合法数量保持不变。 */
+export function ensureMinimumAgents(pattern, count) {
+  const minimum = minAgentsForPattern(pattern)
+  return Number.isInteger(count) && count >= minimum ? count : minimum
+}
+
+/** 把数量收敛到 [minAgents, MAX_AGENT_COUNT]，非法值回落到下限。 */
+export function clampAgentCount(pattern, count) {
+  const minimum = minAgentsForPattern(pattern)
+  const value = Number.isInteger(count) ? count : minimum
+  return Math.min(MAX_AGENT_COUNT, Math.max(minimum, value))
 }
 
 export const providerOptions = [

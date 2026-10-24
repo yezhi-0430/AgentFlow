@@ -211,8 +211,20 @@ def test_import_rejects_invalid_definitions(client):
     )
     assert client.post("/api/workflows/import", json=unknown_agent).status_code == 400
 
-    unsupported = dict(base, pattern="debate")
-    assert client.post("/api/workflows/import", json=unsupported).status_code == 400
+    debate = dict(
+        base,
+        pattern="debate",
+        agents=[
+            {"name": f"debater_{i}", "role": "worker", "model": "m"}
+            for i in (1, 2)
+        ] + [{"name": "judge", "role": "reviewer", "model": "m"}],
+        steps=[{"id": f"step_{i}", "agent_name": f"debater_{i}"} for i in (1, 2)]
+        + [{"id": "judge", "agent_name": "judge"}],
+    )
+    assert client.post("/api/workflows/import", json=debate).status_code == 200
+
+    bad_debate = dict(base, pattern="debate")
+    assert client.post("/api/workflows/import", json=bad_debate).status_code == 400
 
     duplicate_step = dict(
         base,
