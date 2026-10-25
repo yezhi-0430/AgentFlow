@@ -48,7 +48,35 @@
 | 结果 | member_1 输出合法 ask_agent JSON → member_2 返回 tuple 不可变 → member_1 基于结果给出最终回答 |
 
 这说明工具协议不仅是假 Agent 单测，真实模型也能按 JSON 协议触发并被执行器正确路由。
-仍未做多轮多工具/超时的真实模型验证。
+
+## 真实模型多工具冒烟
+
+- 模式：`group_chat`，Lead + 2 个成员
+- 任务：要求 member_1 连续两轮用 `ask_agent` 向 member_2 核对两个事实，最后由 Lead 总结
+- 结果：
+
+| 项目 | 结果 |
+| --- | --- |
+| 执行状态 | `completed` |
+| 工具步骤 | 4 个：2 次 `tool_*_member_1_member_2` + 2 次 `tool_followup_*_member_1` |
+| 总 token | 6,917 |
+| 行为 | 两轮核对分别返回 tuple 不可变 / list 可变，member_1 汇总，Lead 收尾 |
+
+说明工具协议支持在 Lead 编排下连续多次调用，而不只是一次性演示。
+
+## 真实模型超时冒烟
+
+- 设置 `AGENTFLOW_STEP_TIMEOUT_SECONDS=1`，无 Lead、2 个成员、`max_turns=1`
+- 结果：
+
+| 项目 | 结果 |
+| --- | --- |
+| 执行状态 | `failed` |
+| 耗时 | ~1.1s |
+| 错误 | `step timed out after 1s` |
+| 行为 | 超时被 `asyncio.wait_for` 取消，没有卡死或无限等待 |
+
+超时错误现在会写入 run.error，而不是只显示笼统的“没有回复”。
 
 ## 真实模型工具边界冒烟
 
@@ -69,7 +97,7 @@
 
 ## 限制
 
-- 仅一次冒烟，未做多轮重复/多人/不同模型对比；
+- 冒烟样本小，未做统计性重复或不同模型对比；
 - 未启用 Langfuse（避免外部写入），trace_id 为空；
 - 未做自动 RSI；
 - 真实模型费用很小但不为零（约千级 token）。

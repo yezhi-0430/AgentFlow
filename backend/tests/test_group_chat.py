@@ -1,4 +1,5 @@
 """group_chat 群聊模式：Lead、轮询、@点名与边界测试（假 Agent，离线）。"""
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -216,6 +217,26 @@ async def test_group_chat_tool_missing_arguments_marks_partial():
 
     assert result["status"] == "partial"
     assert second.calls == []
+
+
+class SlowAgent(ScriptedAgent):
+    async def process(self, message):
+        await asyncio.sleep(0.05)
+        return await super().process(message)
+
+
+@pytest.mark.asyncio
+async def test_group_chat_timeout_reports_step_error(monkeypatch):
+    monkeypatch.setenv("AGENTFLOW_STEP_TIMEOUT_SECONDS", "0.01")
+    slow = SlowAgent("member_1", AgentRole.WORKER, ["太慢"])
+    second = ScriptedAgent("member_2", AgentRole.WORKER, ["正常"])
+    executor = build_executor([slow, second], max_iterations=1)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "failed"
+    run = executor.get_run(result["run_id"])
+    assert "timed out" in (run.error or "")
 
 
 @pytest.mark.asyncio

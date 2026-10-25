@@ -1703,6 +1703,7 @@ class WorkflowExecutor:
         # 无 Lead：round-robin，并用 @name 或 JSON handoff 做轻量交接
         next_index = 0
         pending_handoff_task = ""
+        last_error = ""
         for turn in range(1, max_turns + 1):
             if run.should_stop():
                 break
@@ -1753,11 +1754,12 @@ class WorkflowExecutor:
             elif outcome["cancelled"]:
                 break
             else:
+                last_error = str(outcome.get("error") or "member failed")
                 had_failure = True
                 break
 
         if not transcript:
-            run.mark_failed("group chat produced no replies")
+            run.mark_failed(last_error or "group chat produced no replies")
             return {"final_result": None, "transcript": transcript}
         if had_failure:
             run.mark_partial("some group chat turns failed")
