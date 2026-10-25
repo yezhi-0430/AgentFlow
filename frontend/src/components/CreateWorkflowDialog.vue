@@ -156,11 +156,15 @@ const MODEL_NOTES = {
 const availableModels = computed(() => modelOptions[form.value.llmProvider] || [])
 const groupModelOptions = computed(() => {
   if (modelCatalog.value.length) {
-    return modelCatalog.value.map(model => {
-      const context = model.context_length ? `${Math.round(model.context_length / 1000)}K` : ''
-      const detail = MODEL_NOTES[model.id] || [model.description, context && `${context} 上下文`, model.supports_tools && '工具调用'].filter(Boolean).join(' · ')
-      return { value: model.id, label: model.name, description: detail || model.id }
-    })
+    return modelCatalog.value
+      .filter(model => !model.id.includes(':batch') && !model.id.includes(':free') && !model.id.startsWith('~'))
+      .map(model => {
+        const context = model.context_length ? `${Math.round(model.context_length / 1000)}K` : ''
+        const baseId = model.id.split(':')[0]
+        const note = MODEL_NOTES[model.id] || MODEL_NOTES[baseId]
+        const detail = note || `通用对话模型 · ${context || '未知'} 上下文${model.supports_tools ? ' · 支持工具调用' : ''}`
+        return { value: model.id, label: model.name, description: detail }
+      })
   }
   return modelOptions.openrouter || []
 })

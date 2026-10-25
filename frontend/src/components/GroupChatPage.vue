@@ -385,9 +385,9 @@ onBeforeUnmount(clearPoll)
 .gc-run-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: #8a9696; font-size: 11px; }
 .gc-run-divider::before, .gc-run-divider::after { content: ''; height: 1px; flex: 1; background: #d9e2e1; }
 .gc-message { display: flex; gap: 10px; margin: 0 0 16px; max-width: 78%; }
-.gc-message.system { max-width: 100%; justify-content: center; }
+.gc-message.system { max-width: 100%; justify-content: flex-start; }
 .gc-message.system .gc-avatar { display: none; }
-.gc-message.system .gc-bubble { background: transparent; color: #6b7777; font-size: 12px; text-align: center; }
+.gc-message.system .gc-bubble { background: transparent; color: #6b7777; font-size: 12px; text-align: left; }
 .gc-message.tool { max-width: 88%; }
 .gc-message.tool .gc-bubble { background: #f1f5f4; border: 1px dashed #b9c8c6; }
 
@@ -468,8 +468,7 @@ onBeforeUnmount(clearPoll)
 .gc-message.is-lead .gc-bubble p, .gc-message.is-lead .gc-bubble summary { color: #fff; }
 .gc-message.is-lead .gc-bubble pre { color: #d6d6d6; }
 .gc-message.is-lead.system { width: fit-content; max-width: 88%; justify-content: flex-end; margin-left: auto; }
-.gc-message.is-lead.system .gc-bubble { text-align: right; }
-.gc-message.is-lead.system .gc-bubble { background: #191919; border: 1px solid #191919; color: #fff; }
+.gc-message.is-lead.system .gc-bubble { background: #191919; border: 1px solid #191919; color: #fff; text-align: right; }
 .gc-message.is-lead.system .gc-bubble p { color: #fff; }
 .gc-message.is-internal { max-width: 92%; }
 .gc-internal-details summary { cursor: pointer; color: #666; font-weight: 600; }
