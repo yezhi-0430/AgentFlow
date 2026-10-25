@@ -93,8 +93,8 @@ npm run dev -- --host 127.0.0.1 --strictPort
 - 创建 API 会对数量越界/低于最低值的请求返回 400；定义导入同样校验。
 - 新增模式复用 `_execute_recorded_step`：步骤记录、超时/重试、停止、token、trace_id 与现有记录格式一致。
 - 动态协调者输出非法 JSON 时回退到第一位 worker，并把运行标记为 partial；群聊 Lead 同样有回退。
-- 群聊成员通过 `@name`、JSON `{"handoff":"member_2","task":"..."}` 或执行器中介工具 `{"tool":"ask_agent","agent":"member_2","task":"..."}` 交接；每轮最多 3 次工具调用；工具目标不存在或缺参数会标记 `partial`，目标 Agent 的结果会回传给调用者。
-- 群聊成员还支持 **OpenAI 兼容原生 function calling**：适配器返回 `tool_calls` 后，`LLMAgent` 在内部执行工具循环（最多 3 轮），执行器把目标 Agent 的结果作为 `tool` 消息回传，再让调用者生成最终回答。原生工具不可用时仍可用上面的 JSON 协议。
+- 群聊成员通过 `@name`、JSON `{"handoff":"member_2","task":"..."}` 或执行器中介工具 `{"tool":"ask_agent","agent":"member_2","task":"..."}` 交接；默认每轮最多 10 次工具调用、每个 run 最多 30 次（`AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_TURN` / `AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_RUN`，硬上限 20/60）；工具目标不存在或缺参数会标记 `partial`，目标 Agent 的结果会回传给调用者。
+- 群聊成员还支持 **OpenAI 兼容原生 function calling**：适配器返回 `tool_calls` 后，`LLMAgent` 在内部执行工具循环（默认最多 10 轮，`AGENTFLOW_GROUP_MAX_TOOL_ROUNDS`，硬上限 20），执行器把目标 Agent 的结果作为 `tool` 消息回传，再让调用者生成最终回答。原生工具不可用时仍可用上面的 JSON 协议。
 - 群聊消息写入 `workflow_messages` 表（写入前脱敏），按 workflow/run 回放；服务重启后独立群聊面板仍能加载历史。
 - 群聊消息的 `content` 保存完整 prompt（模型实际看到的上下文），时间线用 `metadata.display_content` 显示短文案，避免把整段 transcript 刷进聊天气泡。
 - 真实模型冒烟见 [GROUP_CHAT_SMOKE.md](GROUP_CHAT_SMOKE.md)。

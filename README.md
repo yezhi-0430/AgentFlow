@@ -14,7 +14,7 @@ AgentFlow 帮助开发者将多个 AI Agent 组织成工作流，让它们按步
 - **工作流定义持久化**：本地 SQLite 保存定义（不含密钥），重启恢复，支持导出/导入。
 - **可选 Langfuse 追踪与评分**：默认关闭；开启后可在 Langfuse 查看调用树、用量与评分，本地记录里保留 trace_id。
 - **Harness²-lite 实验对比**：配置指纹、脱敏执行证据、独立 judge、候选对比报告与前端实验面板；不自动修改工作流。
-- **质量状态**：后端 218 个测试、前端 127 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
+- **质量状态**：后端 219 个测试、前端 127 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
 
 创建七种协作模式：
 
@@ -148,7 +148,7 @@ flowchart TD
 - **运行记录可回看**：每次执行生成独立 run_id，记录任务输入、配置快照、步骤输入输出、模型、状态、错误、耗时和用量类型；刷新页面后可从「运行历史」重新读取。
 - **失败与停止语义真实**：必需步骤失败会停止后续步骤，失败内容不会作为正常材料继续传递；并行失败会区分全部成功/部分失败/全部失败；停止会阻止后续调用并标记已取消步骤。
 
-当前支持 **顺序、并行、层次、辩论、投票、动态、群聊** 七种模式；群聊为受控共享 transcript（可选 Lead、最多 6 人），尚未接入工具调用/自动 RSI；实验数据集仍以顺序/并行配置为主。其他限制见 [当前限制](docs/limitations.md)。
+当前支持 **顺序、并行、层次、辩论、投票、动态、群聊** 七种模式；群聊为受控共享 transcript（可选 Lead、最多 6 人），已接入执行器中介工具与原生 function calling（工具预算可配）；尚未接入自动 RSI；实验数据集仍以顺序/并行配置为主。其他限制见 [当前限制](docs/limitations.md)。
 
 ## 可视化工作台
 
@@ -287,7 +287,7 @@ python scripts/dev.py --backend-port 8002 --frontend-port 5176
 | 辩论模式 | 多辩手两轮讨论（第二轮互看观点）→ 裁判综合；至少 3 个智能体（2 辩手 + 1 裁判） |
 | 投票模式 | 多候选独立作答 → 裁判比较裁决；至少 3 个智能体（2 候选 + 1 裁判） |
 | 动态协作 | 协调者逐轮选择工作者，最多 `max_iterations` 轮，最后汇总；至少 2 个智能体（1 协调 + 1 工作者） |
-| 群聊协作 | 共享群聊记录；可选 Lead 分派/总结，或成员 round-robin + `@点名` / 结构化 handoff / `ask_agent` 工具协议；独立群聊导航；消息持久化（重启回放）；2–6 个智能体，最多 20 轮 |
+| 群聊协作 | 共享群聊记录；可选 Lead 分派/总结，或成员 round-robin + `@点名` / 结构化 handoff / `ask_agent` 工具协议；独立群聊导航；消息持久化（重启回放）；工具预算默认 10 次/轮、30 次/run（可配）；2–6 个智能体，最多 20 轮 |
 | 运行实例与记录 | 每次执行独立 run_id；本地 SQLite 持久化，schema v4，刷新后可回看 |
 | 工作流定义 | 本地 SQLite 持久化（schema v1，不含密钥），重启后恢复；支持定义导出/导入 |
 | 执行控制 | 停止按钮/停止接口；可选单步超时与有限重试；错误类型与尝试次数记录；失败不重试鉴权错误 |
@@ -295,7 +295,7 @@ python scripts/dev.py --backend-port 8002 --frontend-port 5176
 | 评测 | 10 个固定 case + 确定性评分 + 一次受控真实模型实验（30 次执行，样本有限，不外推质量结论） |
 | Harness²-lite | 配置指纹、脱敏证据（默认关闭/90 天）、独立 judge（≤50 次/轮）、候选对比报告与前端实验面板；真实实验一次受控运行 |
 | 追踪关联 | Langfuse 可选；run 记录/实验 case 带 trace_id，未启用时为 null |
-| 测试与 CI | 后端 218、前端 127 个测试；GitHub Actions backend/frontend 两个 job 通过 |
+| 测试与 CI | 后端 219、前端 127 个测试；GitHub Actions backend/frontend 两个 job 通过 |
 | 本地访问控制 | 可选 `AGENTFLOW_API_TOKEN`（Bearer）；默认关闭，不替代生产鉴权 |
 | 团队或公网部署 | 尚无完整鉴权、多用户隔离，需要进一步开发 |
 
@@ -327,7 +327,7 @@ python scripts/run_experiment.py --config all
 python scripts/run_baseline.py   # 重新生成 docs/BASELINE_REPORT.md
 ```
 
-前端测试使用 Node 自带测试运行器；后端测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查（backend：pytest + 假模型实验冒烟 + wheel + check_repo；frontend：lint + test + build）。当前后端 218、前端 127 个测试，数字与最近一次基线见 [基线报告](docs/BASELINE_REPORT.md)。
+前端测试使用 Node 自带测试运行器；后端测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查（backend：pytest + 假模型实验冒烟 + wheel + check_repo；frontend：lint + test + build）。当前后端 219、前端 127 个测试，数字与最近一次基线见 [基线报告](docs/BASELINE_REPORT.md)。
 
 ## 项目结构
 

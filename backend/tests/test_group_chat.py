@@ -13,6 +13,7 @@ from agentflow.core.workflow import (
     WorkflowExecutor,
     WorkflowPattern,
     WorkflowStep,
+    _group_tool_limits,
 )
 
 
@@ -292,6 +293,15 @@ async def test_group_chat_native_tool_calls_are_executed():
     run = executor.get_run(result["run_id"])
     assert any(step.step_id.startswith("native_tool_") for step in run.step_results)
     assert "基于工具结果的最终答案" in (result["result"]["final_result"] or "")
+
+
+def test_group_tool_limits_are_configurable(monkeypatch):
+    monkeypatch.setenv("AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_TURN", "5")
+    monkeypatch.setenv("AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_RUN", "15")
+    monkeypatch.setenv("AGENTFLOW_GROUP_MAX_TOOL_ROUNDS", "7")
+    assert _group_tool_limits() == (5, 15, 7)
+    monkeypatch.setenv("AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_TURN", "999")
+    assert _group_tool_limits()[0] == 20  # 硬上限
 
 
 @pytest.mark.asyncio

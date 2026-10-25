@@ -63,7 +63,9 @@ MAX_AGENTS_BY_PATTERN = {
     "group_chat": 6,
 }
 MAX_RUNS_IN_MEMORY = 50
-MAX_GROUP_TOOL_CALLS = 3
+DEFAULT_GROUP_TOOL_CALLS_PER_TURN = 10
+DEFAULT_GROUP_TOOL_CALLS_PER_RUN = 30
+DEFAULT_GROUP_TOOL_ROUNDS = 10
 GROUP_CHAT_TOOLS = [
     {
         "type": "function",
@@ -191,6 +193,15 @@ def _env_int(name: str, default: int, minimum: int = 0, maximum: int = 10**9) ->
     except (TypeError, ValueError):
         value = default
     return max(minimum, min(value, maximum))
+
+
+def _group_tool_limits() -> Tuple[int, int, int]:
+    """(每轮调用上限, 每个 run 调用上限, 每轮工具循环轮数上限)。"""
+    return (
+        _env_int("AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_TURN", DEFAULT_GROUP_TOOL_CALLS_PER_TURN, 1, 20),
+        _env_int("AGENTFLOW_GROUP_MAX_TOOL_CALLS_PER_RUN", DEFAULT_GROUP_TOOL_CALLS_PER_RUN, 1, 60),
+        _env_int("AGENTFLOW_GROUP_MAX_TOOL_ROUNDS", DEFAULT_GROUP_TOOL_ROUNDS, 1, 20),
+    )
 
 
 def _extract_usage(raw_usage: Any) -> Tuple[Optional[Dict[str, Any]], UsageType]:
@@ -1531,6 +1542,7 @@ class WorkflowExecutor:
         trace,
         index: int,
         tool_calls: int,
+        max_calls: int,
     ) -> Tuple[bool, int, int, bool]:
         """执行 Agent 发起的 ask_agent / handoff_to；返回 (handled, index, calls, ok)。"""
         directive = self._parse_group_tool(content)
@@ -1538,7 +1550,7 @@ class WorkflowExecutor:
             return False, index, tool_calls, True
         if directive.get("invalid"):
             return True, index, tool_calls, False
-        if tool_calls >= MAX_GROUP_TOOL_CALLS:
+        if tool_calls >= max_calls:
             return True, index, tool_calls, False
         target = directive["agent"]
         if target not in member_names:
@@ -1594,6 +1606,7 @@ class WorkflowExecutor:
         trace,
         index: int,
         state: Dict[str, Any],
+        max_calls: int,
     ):
         """构造原生 function calling 的工具处理器。"""
 
@@ -1606,7 +1619,7 @@ class WorkflowExecutor:
             if target not in member_names or not tool_task:
                 state["failed"] = True
                 return "Tool error: agent must be a member and task must be non-empty"
-            if state["calls"] >= MAX_GROUP_TOOL_CALLS:
+            if state["calls"] >= max_calls:
                 state["failed"] = True
                 return "Tool error: group tool call budget exhausted"
             target_agent = self.agents.get(target)
@@ -1646,6 +1659,7 @@ class WorkflowExecutor:
             raise ValueError("group_chat pattern requires at least 2 agents")
 
         max_turns = max(1, min(20, int(self.config.max_iterations or 12)))
+        max_tool_calls_per_turn, max_tool_calls_per_run, max_tool_rounds = _group_tool_limits()
         first = self.config.agents[0]
         first_role = getattr(first.role, "value", str(first.role))
         lead_config = first if first_role == "coordinator" else None
@@ -1733,10 +1747,11 @@ class WorkflowExecutor:
                 native_state = {"calls": 0, "failed": False}
                 if hasattr(member, "tools"):
                     member.tools = GROUP_CHAT_TOOLS
+                    member.max_tool_rounds = max_tool_rounds
                     member.tool_handler = self._make_group_native_handler(
                         caller_name=next_name, task=task, member_names=member_names,
                         transcript=transcript, run=run, trace=trace, index=index,
-                        state=native_state,
+                        state=native_state, max_calls=max_tool_calls_per_turn,
                     )
                 try:
                     reply = await self._execute_recorded_step(
@@ -1749,6 +1764,7 @@ class WorkflowExecutor:
                     if hasattr(member, "tools"):
                         member.tools = None
                         member.tool_handler = None
+                        member.max_tool_rounds = 3
                 index += 1
                 tool_calls += native_state["calls"]
                 if native_state["failed"]:
@@ -1759,6 +1775,7 @@ class WorkflowExecutor:
                         caller_name=next_name, content=reply["content"] or "", task=task,
                         member_names=member_names, transcript=transcript,
                         run=run, trace=trace, index=index, tool_calls=tool_calls,
+                        max_calls=max_tool_calls_per_run,
                     )
                     if handled:
                         if not tool_ok:
@@ -1825,10 +1842,11 @@ class WorkflowExecutor:
             native_state = {"calls": 0, "failed": False}
             if hasattr(agent, "tools"):
                 agent.tools = GROUP_CHAT_TOOLS
+                agent.max_tool_rounds = max_tool_rounds
                 agent.tool_handler = self._make_group_native_handler(
                     caller_name=speaker, task=task, member_names=member_names,
                     transcript=transcript, run=run, trace=trace, index=index,
-                    state=native_state,
+                    state=native_state, max_calls=max_tool_calls_per_turn,
                 )
             try:
                 outcome = await self._execute_recorded_step(
@@ -1841,6 +1859,7 @@ class WorkflowExecutor:
                 if hasattr(agent, "tools"):
                     agent.tools = None
                     agent.tool_handler = None
+                    agent.max_tool_rounds = 3
             index += 1
             tool_calls += native_state["calls"]
             if native_state["failed"]:
@@ -1852,6 +1871,7 @@ class WorkflowExecutor:
                     caller_name=speaker, content=content, task=task,
                     member_names=member_names, transcript=transcript,
                     run=run, trace=trace, index=index, tool_calls=tool_calls,
+                    max_calls=max_tool_calls_per_run,
                 )
                 if handled:
                     if not tool_ok:
