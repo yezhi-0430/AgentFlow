@@ -12,14 +12,32 @@ class OpenRouterAdapter(LLMAdapter):
     # OpenRouter 支持的模型列表（精简版 - 只保留指定模型）
     SUPPORTED_MODELS = {
         # OpenAI 模型
-        "gpt-6.1-sol": "openai/gpt-6.1-sol",
+        "gpt-4o": "openai/gpt-4o",
+        "gpt-4o-mini": "openai/gpt-4o-mini",
+        "gpt-5": "openai/gpt-5",
 
         # Anthropic 模型
-        "claude-3-5-haiku": "anthropic/claude-3-5-haiku",
-        "claude-opus-5-5": "anthropic/claude-opus-5-5",
+        "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet",
+        "claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
+        "claude-sonnet-4.5": "anthropic/claude-sonnet-4.5",
+
+        # Google 模型
+        "gemini-2.0-flash": "google/gemini-2.0-flash-001",
+        "gemini-2.5-pro": "google/gemini-2.5-pro",
 
         # DeepSeek 模型
-        "deepseek-v4-flash": "deepseek/deepseek-v4-flash",
+        "deepseek-chat": "deepseek/deepseek-chat",
+        "deepseek-chat-v3.1": "deepseek/deepseek-chat-v3.1",
+
+        # Qwen / xAI / Mistral / Meta / Moonshot / Zhipu / MiniMax / Cohere
+        "qwen-2.5-72b": "qwen/qwen-2.5-72b-instruct",
+        "grok-2": "x-ai/grok-2-1212",
+        "mistral-large": "mistralai/mistral-large",
+        "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct",
+        "kimi-k2": "moonshotai/kimi-k2",
+        "glm-4.5": "z-ai/glm-4.5",
+        "minimax-m2": "minimax/minimax-m2",
+        "command-a": "cohere/command-a",
     }
 
     def __init__(
