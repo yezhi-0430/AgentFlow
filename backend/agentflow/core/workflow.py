@@ -1575,8 +1575,9 @@ class WorkflowExecutor:
                 "plan_errors": plan_errors,
             }
 
-        # 无 Lead：round-robin，并用 @name 做轻量点名
+        # 无 Lead：round-robin，并用 @name 或 JSON handoff 做轻量交接
         next_index = 0
+        pending_handoff_task = ""
         for turn in range(1, max_turns + 1):
             if run.should_stop():
                 break
@@ -1585,10 +1586,12 @@ class WorkflowExecutor:
             if agent is None:
                 had_failure = True
                 break
+            handoff_note = f"\n[上一位交接的任务] {pending_handoff_task}" if pending_handoff_task else ""
             group_input = (
                 f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
                 f"[群聊] 你是 {speaker}。请阅读以上讨论，补充观点或推进任务；"
                 "如需点名其他人，可在回复中使用 @成员名。"
+                + handoff_note
             )
             outcome = await self._execute_recorded_step(
                 step=WorkflowStep(id=f"turn_{turn}_{speaker}", agent_name=speaker),
@@ -1600,8 +1603,14 @@ class WorkflowExecutor:
             if outcome["ok"]:
                 content = outcome["content"] or ""
                 remember(speaker, content)
+                pending_handoff_task = ""
+                handoff = self._parse_dynamic_plan(content)
+                handoff_target = str(handoff.get("handoff") or handoff.get("next") or "") if handoff else ""
                 mention = re.search(r"@([A-Za-z0-9_\-]+)", content)
-                if mention and mention.group(1) in member_names:
+                if handoff_target in member_names:
+                    next_index = member_names.index(handoff_target)
+                    pending_handoff_task = str(handoff.get("task") or "").strip()
+                elif mention and mention.group(1) in member_names:
                     next_index = member_names.index(mention.group(1))
                 else:
                     next_index += 1

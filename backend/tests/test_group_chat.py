@@ -110,6 +110,23 @@ async def test_group_chat_respects_max_turns_and_summarizes():
 
 
 @pytest.mark.asyncio
+async def test_group_chat_structured_handoff_routes_and_carries_task():
+    first = ScriptedAgent("member_1", AgentRole.WORKER, [
+        '{"handoff": "member_3", "task": "请补充风险部分"}'
+    ])
+    second = ScriptedAgent("member_2", AgentRole.WORKER, ["不该被选中"])
+    third = ScriptedAgent("member_3", AgentRole.WORKER, ["补充风险分析"])
+    executor = build_executor([first, second, third], max_iterations=2)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "completed"
+    assert [row[0] for row in result["result"]["transcript"]] == ["member_1", "member_3"]
+    run = executor.get_run(result["run_id"])
+    assert "请补充风险部分" in (run.step_results[-1].input_text or "")
+
+
+@pytest.mark.asyncio
 async def test_group_chat_requires_at_least_two_agents():
     only = ScriptedAgent("member_1", AgentRole.WORKER, ["x"])
     executor = build_executor([only])
