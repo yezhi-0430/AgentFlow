@@ -120,6 +120,10 @@
   .creation-footer .btn { padding-left: 14px; padding-right: 14px; }
   .select-trigger { font-size: 13px; }
 }
+.group-chat-settings { border: 1px solid #ececec; border-radius: 10px; padding: 12px 13px; background: #fafafa; }
+.group-chat-lead { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #333; cursor: pointer; }
+.group-chat-lead input { width: 15px; height: 15px; accent-color: #111; }
+
 @media (max-width: 430px) {
   .creation-heading-icon { display: none; }
   .creation-readiness { display: none; }

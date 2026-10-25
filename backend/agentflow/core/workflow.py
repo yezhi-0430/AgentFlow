@@ -46,6 +46,7 @@ SUPPORTED_PATTERNS = (
     "debate",
     "voting",
     "dynamic",
+    "group_chat",
 )
 # 各模式对智能体数量的最低要求：协调者/裁判需要独立成员
 MIN_AGENTS_BY_PATTERN = {
@@ -55,6 +56,11 @@ MIN_AGENTS_BY_PATTERN = {
     "debate": 3,
     "voting": 3,
     "dynamic": 2,
+    "group_chat": 2,
+}
+# 群聊最多 6 人，避免上下文和成本失控；其余模式沿用全局上限 10
+MAX_AGENTS_BY_PATTERN = {
+    "group_chat": 6,
 }
 MAX_RUNS_IN_MEMORY = 50
 PARALLEL_STOP_POLL_INTERVAL = 0.05
@@ -78,13 +84,14 @@ class UnsupportedPatternError(ValueError):
 
 
 class WorkflowPattern(Enum):
-    """工作流模式；只有 SEQUENTIAL / PARALLEL 可执行"""
+    """工作流模式；全部模式由执行器实现，group_chat 为共享群聊。"""
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
     DEBATE = "debate"
     VOTING = "voting"
     HIERARCHICAL = "hierarchical"
     DYNAMIC = "dynamic"
+    GROUP_CHAT = "group_chat"
 
 
 def ensure_supported_pattern(pattern: WorkflowPattern) -> None:
@@ -97,7 +104,7 @@ def ensure_supported_pattern(pattern: WorkflowPattern) -> None:
 
 
 def validate_pattern_agents(pattern: WorkflowPattern, agent_count: int) -> None:
-    """校验模式所需的最低智能体数量。"""
+    """校验模式要求的智能体数量范围。"""
     value = pattern.value if isinstance(pattern, WorkflowPattern) else str(pattern)
     minimum = MIN_AGENTS_BY_PATTERN.get(value, 1)
     if agent_count < minimum:
@@ -105,8 +112,12 @@ def validate_pattern_agents(pattern: WorkflowPattern, agent_count: int) -> None:
             f"Workflow pattern '{value}' requires at least {minimum} agents "
             f"(got {agent_count})"
         )
-    if agent_count > 10:
-        raise ValueError("at most 10 agents are supported")
+    maximum = MAX_AGENTS_BY_PATTERN.get(value, 10)
+    if agent_count > maximum:
+        raise ValueError(
+            f"Workflow pattern '{value}' supports at most {maximum} agents "
+            f"(got {agent_count})"
+        )
 
 
 @dataclass
@@ -475,6 +486,8 @@ class WorkflowExecutor:
                 workflow_result = await self._execute_voting(initial_task, run, trace)
             elif self.config.pattern == WorkflowPattern.DYNAMIC:
                 workflow_result = await self._execute_dynamic(initial_task, run, trace)
+            elif self.config.pattern == WorkflowPattern.GROUP_CHAT:
+                workflow_result = await self._execute_group_chat(initial_task, run, trace)
             else:  # pragma: no cover - ensure_supported_pattern 已保证不会到这里
                 raise UnsupportedPatternError(f"Unhandled pattern: {self.config.pattern}")
 
@@ -965,6 +978,10 @@ class WorkflowExecutor:
         run: WorkflowRun,
         trace,
         index: int,
+        sender: str = "system",
+        receiver: Optional[str] = None,
+        response_receiver: Optional[str] = None,
+        message_content: Optional[str] = None,
     ) -> Dict[str, Any]:
         """执行单个步骤并写记录；供层次/辩论/投票/动态模式复用。
 
@@ -987,9 +1004,9 @@ class WorkflowExecutor:
             started_at=time.time(),
         )
         message = Message(
-            sender="system",
-            receiver=step.agent_name,
-            content=input_text,
+            sender=sender,
+            receiver=receiver or step.agent_name,
+            content=message_content if message_content is not None else input_text,
             message_type=MessageType.TASK,
             metadata={"step_id": step.id, "step_index": index, "run_id": run.run_id},
         )
@@ -1028,6 +1045,9 @@ class WorkflowExecutor:
 
         response = outcome.get("response") or outcome.get("last_response")
         if response is not None:
+            if response_receiver:
+                response.sender = step.agent_name
+                response.receiver = response_receiver
             step_result.output_message_id = response.id
             step_result.output_text = self._record_text(response.content)
             model, finish_reason = self._extract_response_meta(response)
@@ -1419,6 +1439,188 @@ class WorkflowExecutor:
             "history": history,
             "rounds": len(history),
             "plan_errors": plan_errors,
+        }
+
+    # -------------------------------------------------------------- group chat
+    async def _execute_group_chat(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
+        """受控 Agent 群聊：Lead 可选；共享 transcript；最多 max_iterations 轮。
+
+        有 Lead（第一个 coordinator）时：Lead 每轮决定下一位发言者/子任务，成员回应；
+        没有 Lead 时：成员按 round-robin 轮流发言。成员回复中的 @name 会优先成为
+        下一位发言者（仅无 Lead 模式），用于轻量的互相点名。
+        """
+        if len(self.config.agents) < 2:
+            raise ValueError("group_chat pattern requires at least 2 agents")
+
+        max_turns = max(1, min(20, int(self.config.max_iterations or 12)))
+        first = self.config.agents[0]
+        first_role = getattr(first.role, "value", str(first.role))
+        lead_config = first if first_role == "coordinator" else None
+        lead_name = lead_config.name if lead_config else None
+        member_names = [cfg.name for cfg in self.config.agents if cfg.name != lead_name]
+        if lead_name and not member_names:
+            raise ValueError("group_chat with a lead requires at least one member")
+        if not member_names:
+            raise ValueError("group_chat requires at least one member")
+
+        transcript: List[Tuple[str, str]] = []
+        index = 0
+        had_failure = False
+        plan_errors = 0
+
+        def transcript_text(limit: int = 16) -> str:
+            recent = transcript[-limit:]
+            return "\n\n".join(f"[{speaker}] {content}" for speaker, content in recent) or "（尚无发言）"
+
+        def remember(speaker: str, content: str) -> None:
+            if content:
+                transcript.append((speaker, content))
+
+        if lead_config:
+            lead = self.agents.get(lead_name)
+            if lead is None:
+                raise ValueError(f"Agent not found: {lead_name}")
+            finished_summary: Optional[str] = None
+            for turn in range(1, max_turns + 1):
+                if run.should_stop():
+                    break
+                plan_input = (
+                    f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
+                    f"[Lead 指令] 你是 {lead_name}。请决定下一步：只输出 JSON，不要输出其他文字。"
+                    "格式：{\"done\": false, \"next\": \"成员名\", \"task\": \"给该成员的具体子任务\"}；"
+                    "如果已经可以结束，输出 {\"done\": true, \"summary\": \"最终总结\"}。"
+                    f"可用成员：{', '.join(member_names)}。"
+                )
+                plan = await self._execute_recorded_step(
+                    step=WorkflowStep(id=f"lead_plan_{turn}", agent_name=lead_name),
+                    agent=lead, input_text=plan_input, run=run, trace=trace, index=index,
+                    sender="group", receiver=lead_name, response_receiver="group",
+                    message_content="[系统] 请 Lead 决定下一位发言者与子任务",
+                )
+                index += 1
+                if not plan["ok"]:
+                    if not plan["cancelled"]:
+                        run.mark_failed(plan["error"] or "lead planning failed")
+                    return {"final_result": None, "transcript": transcript}
+
+                payload = self._parse_dynamic_plan(plan["content"])
+                remember(lead_name, plan["content"] or "")
+                if payload and payload.get("done") is True:
+                    finished_summary = str(payload.get("summary") or plan["content"] or "")
+                    break
+
+                if payload:
+                    next_name = str(payload.get("next") or payload.get("worker") or "").strip()
+                    subtask = str(payload.get("task") or payload.get("subtask") or "继续推进任务")
+                else:
+                    plan_errors += 1
+                    next_name = ""
+                    subtask = plan["content"] or "继续推进任务"
+                if next_name not in member_names:
+                    if next_name:
+                        plan_errors += 1
+                    next_name = member_names[(turn - 1) % len(member_names)]
+
+                member = self.agents.get(next_name)
+                if member is None:
+                    had_failure = True
+                    break
+                member_input = (
+                    f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
+                    f"[Lead 指派] {subtask}\n请作为 {next_name} 回应并推进任务。"
+                )
+                reply = await self._execute_recorded_step(
+                    step=WorkflowStep(id=f"turn_{turn}_{next_name}", agent_name=next_name),
+                    agent=member, input_text=member_input, run=run, trace=trace, index=index,
+                    sender=lead_name, receiver=next_name, response_receiver="group",
+                    message_content=subtask,
+                )
+                index += 1
+                if reply["ok"]:
+                    remember(next_name, reply["content"] or "")
+                elif reply["cancelled"]:
+                    break
+                else:
+                    had_failure = True
+                    break
+
+            if run.should_stop():
+                return {"final_result": None, "transcript": transcript}
+
+            if finished_summary is not None:
+                final_content = finished_summary
+            else:
+                summary_input = (
+                    f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
+                    f"[Lead 总结] 你是 {lead_name}，请根据以上讨论给出最终交付。"
+                )
+                final = await self._execute_recorded_step(
+                    step=WorkflowStep(id="lead_summary", agent_name=lead_name),
+                    agent=lead, input_text=summary_input, run=run, trace=trace, index=index,
+                    sender="group", receiver=lead_name, response_receiver="group",
+                    message_content="请总结以上群聊并给出最终交付",
+                )
+                if not final["ok"]:
+                    if not final["cancelled"]:
+                        run.mark_failed(final["error"] or "lead summary failed")
+                    return {"final_result": None, "transcript": transcript}
+                final_content = final["content"]
+
+            if had_failure or plan_errors:
+                run.mark_partial("group chat had failed turns or fallback plans")
+            return {
+                "final_result": final_content,
+                "transcript": transcript,
+                "turns": len(transcript),
+                "plan_errors": plan_errors,
+            }
+
+        # 无 Lead：round-robin，并用 @name 做轻量点名
+        next_index = 0
+        for turn in range(1, max_turns + 1):
+            if run.should_stop():
+                break
+            speaker = member_names[next_index % len(member_names)]
+            agent = self.agents.get(speaker)
+            if agent is None:
+                had_failure = True
+                break
+            group_input = (
+                f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
+                f"[群聊] 你是 {speaker}。请阅读以上讨论，补充观点或推进任务；"
+                "如需点名其他人，可在回复中使用 @成员名。"
+            )
+            outcome = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"turn_{turn}_{speaker}", agent_name=speaker),
+                agent=agent, input_text=group_input, run=run, trace=trace, index=index,
+                sender="group", receiver=speaker, response_receiver="group",
+                message_content="请继续群聊，补充观点或推进任务",
+            )
+            index += 1
+            if outcome["ok"]:
+                content = outcome["content"] or ""
+                remember(speaker, content)
+                mention = re.search(r"@([A-Za-z0-9_\-]+)", content)
+                if mention and mention.group(1) in member_names:
+                    next_index = member_names.index(mention.group(1))
+                else:
+                    next_index += 1
+            elif outcome["cancelled"]:
+                break
+            else:
+                had_failure = True
+                break
+
+        if not transcript:
+            run.mark_failed("group chat produced no replies")
+            return {"final_result": None, "transcript": transcript}
+        if had_failure:
+            run.mark_partial("some group chat turns failed")
+        return {
+            "final_result": transcript[-1][1],
+            "transcript": transcript,
+            "turns": len(transcript),
+            "plan_errors": 0,
         }
 
     # ------------------------------------------------------------------ helpers

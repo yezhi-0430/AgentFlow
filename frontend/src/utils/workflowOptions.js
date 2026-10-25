@@ -1,10 +1,10 @@
-// 后端已实现全部六种协作模式，创建、导入与执行阶段均按此列表放行。
-export const supportedWorkflowPatterns = ['sequential', 'parallel', 'hierarchical', 'debate', 'voting', 'dynamic']
+// 后端已实现全部七种协作模式，创建、导入与执行阶段均按此列表放行。
+export const supportedWorkflowPatterns = ['sequential', 'parallel', 'hierarchical', 'debate', 'voting', 'dynamic', 'group_chat']
 
 /** 创建弹窗与创建接口统一的智能体数量上限。 */
 export const MAX_AGENT_COUNT = 10
 
-/** 各模式的最少智能体数量：协调者/裁判必须是独立成员。 */
+/** 各模式的最少智能体数量：协调者/裁判/群聊需要独立成员。 */
 export const MIN_AGENTS_BY_PATTERN = {
   sequential: 1,
   parallel: 1,
@@ -12,6 +12,12 @@ export const MIN_AGENTS_BY_PATTERN = {
   debate: 3,
   voting: 3,
   dynamic: 2,
+  group_chat: 2,
+}
+
+/** 群聊模式最多 6 人，避免上下文和成本失控。 */
+export const MAX_AGENTS_BY_PATTERN = {
+  group_chat: 6,
 }
 
 /** 协作模式中文名，用于列表与摘要展示。 */
@@ -22,19 +28,21 @@ export const workflowPatternLabels = {
   debate: '辩论模式',
   voting: '投票模式',
   dynamic: '动态协作',
+  group_chat: '群聊协作',
 }
 
 /**
  * 创建弹窗展示的协作模式。roleHint 说明该模式的团队角色构成，
- * minAgents 与后端 validate_pattern_agents 保持一致。
+ * minAgents/maxAgents 与后端 validate_pattern_agents 保持一致。
  */
 export const creationPatterns = [
-  { value: 'sequential', label: '顺序执行', icon: 'arrow', description: '依次推进任务', roleHint: '全部为工作者', minAgents: 1, supported: true },
-  { value: 'parallel', label: '并行执行', icon: 'parallel', description: '同时分工协作', roleHint: '全部为工作者', minAgents: 1, supported: true },
-  { value: 'hierarchical', label: '层次协作', icon: 'hierarchy', description: '统筹与分层执行', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, supported: true },
-  { value: 'debate', label: '辩论模式', icon: 'message', description: '讨论并汇聚共识', roleHint: '多位辩手 + 1 位裁判', minAgents: 3, supported: true },
-  { value: 'voting', label: '投票模式', icon: 'check', description: '多智能体投票决策', roleHint: '多位候选者 + 1 位裁判', minAgents: 3, supported: true },
-  { value: 'dynamic', label: '动态协作', icon: 'sliders', description: '运行时动态编排任务', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, supported: true },
+  { value: 'sequential', label: '顺序执行', icon: 'arrow', description: '依次推进任务', roleHint: '全部为工作者', minAgents: 1, maxAgents: 10, supported: true },
+  { value: 'parallel', label: '并行执行', icon: 'parallel', description: '同时分工协作', roleHint: '全部为工作者', minAgents: 1, maxAgents: 10, supported: true },
+  { value: 'hierarchical', label: '层次协作', icon: 'hierarchy', description: '统筹与分层执行', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, maxAgents: 10, supported: true },
+  { value: 'debate', label: '辩论模式', icon: 'message', description: '讨论并汇聚共识', roleHint: '多位辩手 + 1 位裁判', minAgents: 3, maxAgents: 10, supported: true },
+  { value: 'voting', label: '投票模式', icon: 'check', description: '多智能体投票决策', roleHint: '多位候选者 + 1 位裁判', minAgents: 3, maxAgents: 10, supported: true },
+  { value: 'dynamic', label: '动态协作', icon: 'sliders', description: '运行时动态编排任务', roleHint: '1 位协调者 + 若干工作者', minAgents: 2, maxAgents: 10, supported: true },
+  { value: 'group_chat', label: '群聊协作', icon: 'message', description: '共享群聊、互相点名', roleHint: '可选 Lead + 群聊成员', minAgents: 2, maxAgents: 6, supported: true },
 ]
 
 export function isSupportedWorkflowPattern(pattern) {
@@ -52,17 +60,24 @@ export function minAgentsForPattern(pattern) {
   return Number.isInteger(minimum) ? minimum : 1
 }
 
+/** 返回某模式的最多智能体数量；未知模式按全局上限处理。 */
+export function maxAgentsForPattern(pattern) {
+  const maximum = MAX_AGENTS_BY_PATTERN[pattern]
+  return Number.isInteger(maximum) ? maximum : MAX_AGENT_COUNT
+}
+
 /** 切换模式时把低于下限的数量抬到下限；合法数量保持不变。 */
 export function ensureMinimumAgents(pattern, count) {
   const minimum = minAgentsForPattern(pattern)
   return Number.isInteger(count) && count >= minimum ? count : minimum
 }
 
-/** 把数量收敛到 [minAgents, MAX_AGENT_COUNT]，非法值回落到下限。 */
+/** 把数量收敛到 [minAgents, maxAgents]，非法值回落到下限。 */
 export function clampAgentCount(pattern, count) {
   const minimum = minAgentsForPattern(pattern)
+  const maximum = maxAgentsForPattern(pattern)
   const value = Number.isInteger(count) ? count : minimum
-  return Math.min(MAX_AGENT_COUNT, Math.max(minimum, value))
+  return Math.min(maximum, Math.max(minimum, value))
 }
 
 export const providerOptions = [

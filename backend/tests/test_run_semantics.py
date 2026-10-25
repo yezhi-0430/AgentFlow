@@ -548,6 +548,7 @@ def test_api_supports_all_patterns_and_enforces_minimum_agents(api_client):
         ("debate", 3),
         ("voting", 3),
         ("dynamic", 2),
+        ("group_chat", 2),
     ):
         response = api_client.post("/api/workflows", json={
             "name": f"pattern-{pattern}",
@@ -567,8 +568,17 @@ def test_api_supports_all_patterns_and_enforces_minimum_agents(api_client):
     assert too_few.status_code == 400
     assert "at least 3" in too_few.json()["detail"]
 
+    too_many_group = api_client.post("/api/workflows", json={
+        "name": "bad-group-chat",
+        "pattern": "group_chat",
+        "config": {"agent_count": 7, "llm_provider": "openai",
+                   "api_key": "test-only", "model": "test-model"},
+    })
+    assert too_many_group.status_code == 400
+    assert "at most 6" in too_many_group.json()["detail"]
 
-def test_api_executes_all_six_patterns(api_client):
+
+def test_api_executes_all_seven_patterns(api_client):
     cases = [
         ("sequential", 2, "completed"),
         ("parallel", 2, "completed"),
@@ -576,6 +586,7 @@ def test_api_executes_all_six_patterns(api_client):
         ("debate", 3, "completed"),
         ("voting", 3, "completed"),
         ("dynamic", 3, "partial"),
+        ("group_chat", 3, "partial"),
     ]
     for pattern, count, expected in cases:
         workflow_id = _create_api_workflow(api_client, pattern=pattern, agent_count=count,
@@ -585,6 +596,27 @@ def test_api_executes_all_six_patterns(api_client):
         status = api_client.get(f"/api/workflows/{workflow_id}/status").json()
         assert status["status"] == expected, (pattern, status)
         assert status["pattern"] == pattern
+
+
+def test_group_chat_lead_can_be_disabled(api_client):
+    with_lead = api_client.post("/api/workflows", json={
+        "name": "group-with-lead",
+        "pattern": "group_chat",
+        "config": {"agent_count": 3, "llm_provider": "openai",
+                   "api_key": "test-only", "model": "test-model"},
+    })
+    assert with_lead.status_code == 200, with_lead.text
+    assert [agent["name"] for agent in with_lead.json()["agents"]] == ["lead", "member_1", "member_2"]
+
+    without_lead = api_client.post("/api/workflows", json={
+        "name": "group-without-lead",
+        "pattern": "group_chat",
+        "config": {"agent_count": 2, "llm_provider": "openai",
+                   "api_key": "test-only", "model": "test-model",
+                   "group_chat": {"enable_lead": False}},
+    })
+    assert without_lead.status_code == 200, without_lead.text
+    assert [agent["name"] for agent in without_lead.json()["agents"]] == ["member_1", "member_2"]
 
 
 def test_api_rejects_second_concurrent_execute(api_client):

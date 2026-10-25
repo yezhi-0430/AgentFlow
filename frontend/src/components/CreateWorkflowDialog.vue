@@ -26,15 +26,19 @@
                   <p class="hint pattern-support-hint">不同协作模式对团队角色与最少智能体数量有不同要求，切换模式会自动调整数量下限。</p>
                 </fieldset>
                 <div class="form-group creation-count-row">
-                  <div><label for="agentCount">智能体数量</label><p class="hint">按任务分工，配置 {{ minAgentCount }}–{{ MAX_AGENT_COUNT }} 个智能体</p></div>
+                  <div><label for="agentCount">智能体数量</label><p class="hint">按任务分工，配置 {{ minAgentCount }}–{{ maxAgentCount }} 个智能体</p></div>
                   <div class="agent-count-control">
                     <button class="icon-button" type="button" aria-label="减少智能体数量" :disabled="creating || form.agentCount <= minAgentCount" @click="adjustAgents(-1)"><AppIcon name="minus" :size="14" /></button>
-                    <input id="agentCount" v-model.number="form.agentCount" type="number" :min="minAgentCount" :max="MAX_AGENT_COUNT" required :disabled="creating" aria-describedby="count-hint" />
-                    <button class="icon-button" type="button" aria-label="增加智能体数量" :disabled="creating || form.agentCount >= MAX_AGENT_COUNT" @click="adjustAgents(1)"><AppIcon name="plus" :size="14" /></button>
+                    <input id="agentCount" v-model.number="form.agentCount" type="number" :min="minAgentCount" :max="maxAgentCount" required :disabled="creating" aria-describedby="count-hint" />
+                    <button class="icon-button" type="button" aria-label="增加智能体数量" :disabled="creating || form.agentCount >= maxAgentCount" @click="adjustAgents(1)"><AppIcon name="plus" :size="14" /></button>
                   </div>
                 </div>
                 <p v-if="countError" id="count-hint" class="creation-inline-error" role="status">{{ countError }}</p>
-                <span v-else id="count-hint" class="sr-only">{{ selectedPattern.label }}最少需要 {{ minAgentCount }} 个智能体，最多 {{ MAX_AGENT_COUNT }} 个。</span>
+                <span v-else id="count-hint" class="sr-only">{{ selectedPattern.label }}最少需要 {{ minAgentCount }} 个智能体，最多 {{ maxAgentCount }} 个。</span>
+                <div v-if="form.pattern === 'group_chat'" class="form-group group-chat-settings">
+                  <label class="group-chat-lead"><input v-model="form.enableLead" type="checkbox" :disabled="creating" /> 启用 Lead Agent</label>
+                  <p class="hint">开启后由 Lead 规划、分派并总结；关闭后成员轮流发言，可用 @成员名 点名。</p>
+                </div>
               </section>
 
               <section class="creation-models" aria-labelledby="model-settings-title">
@@ -85,7 +89,7 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import AppIcon from './AppIcon.vue'
 import AppSelect from './AppSelect.vue'
-import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, MAX_AGENT_COUNT, minAgentsForPattern, ensureMinimumAgents, clampAgentCount } from '../utils/workflowOptions'
+import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, minAgentsForPattern, maxAgentsForPattern, clampAgentCount } from '../utils/workflowOptions'
 import { useWorkflowStore } from '../stores/workflow'
 import { workflowService } from '../services/workflow'
 import { validateConnection, formatExecutionError } from '../utils/connection.js'
@@ -96,7 +100,7 @@ const workflowStore = useWorkflowStore()
 const defaults = () => {
   const provider = props.preset?.llmProvider || 'openai'
   const pattern = normalizeCreationPattern(props.preset?.pattern)
-  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
+  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
 }
 const form = ref(defaults())
 const creating = ref(false)
@@ -113,19 +117,20 @@ const selectedModel = computed(() => availableModels.value.find(model => model.v
 const patterns = creationPatterns
 const selectedPattern = computed(() => patterns.find(pattern => pattern.value === form.value.pattern) || patterns[0])
 const minAgentCount = computed(() => minAgentsForPattern(form.value.pattern))
-const validCount = computed(() => Number.isInteger(form.value.agentCount) && form.value.agentCount >= minAgentCount.value && form.value.agentCount <= MAX_AGENT_COUNT)
+const maxAgentCount = computed(() => maxAgentsForPattern(form.value.pattern))
+const validCount = computed(() => Number.isInteger(form.value.agentCount) && form.value.agentCount >= minAgentCount.value && form.value.agentCount <= maxAgentCount.value)
 const countError = computed(() => {
   const count = form.value.agentCount
   if (!Number.isInteger(count)) return '请输入整数智能体数量。'
   if (count < minAgentCount.value) return `${selectedPattern.value.label}至少需要 ${minAgentCount.value} 个智能体。`
-  if (count > MAX_AGENT_COUNT) return `最多支持 ${MAX_AGENT_COUNT} 个智能体。`
+  if (count > maxAgentCount.value) return `${selectedPattern.value.label}最多支持 ${maxAgentCount.value} 个智能体。`
   return ''
 })
 const connectionError = computed(() => validateConnection(form.value.llmProvider, form.value.apiKey))
 const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && selectedModel.value && !connectionError.value))
 
 watch(() => form.value.llmProvider, provider => { form.value.model = modelOptions[provider]?.[0]?.value || '' })
-watch(() => form.value.pattern, pattern => { form.value.agentCount = ensureMinimumAgents(pattern, form.value.agentCount) })
+watch(() => form.value.pattern, pattern => { form.value.agentCount = clampAgentCount(pattern, form.value.agentCount) })
 watch(() => props.modelValue, async open => {
   if (open) {
     previousFocus = document.activeElement
@@ -163,7 +168,13 @@ async function create() {
   try {
     const result = await workflowService.createWorkflow({
       name: form.value.name.trim(), description: form.value.description, pattern: normalizeCreationPattern(form.value.pattern),
-      config: { agent_count: form.value.agentCount, llm_provider: form.value.llmProvider, api_key: form.value.apiKey.trim(), model: form.value.model || undefined },
+      config: {
+        agent_count: form.value.agentCount,
+        llm_provider: form.value.llmProvider,
+        api_key: form.value.apiKey.trim(),
+        model: form.value.model || undefined,
+        group_chat: form.value.pattern === 'group_chat' ? { enable_lead: form.value.enableLead } : undefined,
+      },
     })
     if (disposed) return
     workflowStore.setWorkflow({ ...result, llm_provider: form.value.llmProvider })

@@ -35,6 +35,7 @@ const patternAgentCounts = {
   debate: 3,
   voting: 3,
   dynamic: 2,
+  group_chat: 2,
 }
 
 const patternLabels = {
@@ -44,6 +45,7 @@ const patternLabels = {
   debate: '辩论模式',
   voting: '投票模式',
   dynamic: '动态协作',
+  group_chat: '群聊协作',
 }
 
 function definitionForPattern(pattern) {
@@ -63,7 +65,7 @@ function definitionForPattern(pattern) {
   return definition
 }
 
-test('六种协作模式的定义均可解析并保留结构', () => {
+test('七种协作模式的定义均可解析并保留结构', () => {
   for (const pattern of Object.keys(patternAgentCounts)) {
     const definition = definitionForPattern(pattern)
     const result = parseWorkflowDefinition(JSON.stringify(definition))
@@ -188,6 +190,22 @@ test('定义中的疑似密钥字段会被识别并清洗，且提示不会回�
   assert.ok(paths.includes('api_key'))
   assert.ok(paths.includes('connection.api_key'))
   assert.ok(paths.includes('agents[0].metadata.access_token'))
+})
+
+test('群聊模式定义最多 6 个智能体', () => {
+  const definition = definitionForPattern('group_chat')
+  definition.agents = Array.from({ length: 7 }, (_, index) => ({
+    name: `agent_${index + 1}`,
+    role: 'worker',
+    model: 'gpt-4',
+  }))
+  definition.steps = definition.agents.map((agent, index) => ({
+    id: `step_${index + 1}`,
+    agent_name: agent.name,
+  }))
+  const result = parseWorkflowDefinition(JSON.stringify(definition))
+  assert.equal(result.ok, false)
+  assert.match(result.error, /最多支持 6 个智能体/)
 })
 
 test('导出文本经过清洗与格式化，文件名安全', () => {

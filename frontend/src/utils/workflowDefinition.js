@@ -5,7 +5,7 @@
  * 目的只是尽早给出中文提示，最终仍以后端校验为准。
  * 定义里永远不应该出现密钥；清洗函数只移除字段，不会打印字段值。
  */
-import { isSupportedWorkflowPattern, supportedWorkflowPatterns, minAgentsForPattern, workflowPatternLabels } from './workflowOptions.js'
+import { isSupportedWorkflowPattern, supportedWorkflowPatterns, minAgentsForPattern, maxAgentsForPattern, workflowPatternLabels } from './workflowOptions.js'
 
 export const DEFINITION_SCHEMA_VERSION = 1
 
@@ -106,6 +106,10 @@ export function parseWorkflowDefinition(rawText) {
   const minimumAgents = minAgentsForPattern(pattern)
   if (definition.agents.length < minimumAgents) {
     return failure(`协作模式 ${workflowPatternLabels[pattern] || pattern} 至少需要 ${minimumAgents} 个智能体，当前定义只有 ${definition.agents.length} 个。`)
+  }
+  const maximumAgents = maxAgentsForPattern(pattern)
+  if (definition.agents.length > maximumAgents) {
+    return failure(`协作模式 ${workflowPatternLabels[pattern] || pattern} 最多支持 ${maximumAgents} 个智能体，当前定义有 ${definition.agents.length} 个。`)
   }
   if (!Array.isArray(definition.steps) || !definition.steps.length) return failure('steps 必须是非空数组。')
   if (definition.steps.length > MAX_STEPS) return failure(`steps 数量过多（最多 ${MAX_STEPS} 个）。`)

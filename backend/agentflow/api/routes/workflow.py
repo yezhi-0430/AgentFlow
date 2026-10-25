@@ -200,7 +200,7 @@ async def get_providers():
 
 
 def _build_pattern_agents(
-    pattern: WorkflowPattern, agent_count: int, model: str
+    pattern: WorkflowPattern, agent_count: int, model: str, *, group_chat_lead: bool = True
 ) -> tuple[List[AgentConfig], List[WorkflowStep]]:
     """按协作模式生成 Agent 配置与展示用步骤（密钥不进入配置）。"""
     agents: List[AgentConfig] = []
@@ -223,6 +223,32 @@ def _build_pattern_agents(
                 id=f"step_{index + 1}", agent_name=name,
                 input_from=f"step_{index}" if pattern == WorkflowPattern.SEQUENTIAL and index > 0 else None,
             ))
+        return agents, steps
+
+    if pattern == WorkflowPattern.GROUP_CHAT:
+        if group_chat_lead:
+            agents.append(agent(
+                "lead", AgentRole.COORDINATOR,
+                "You are the lead of a group chat. Decide who speaks next, assign focused subtasks, "
+                "keep the discussion on track, and produce the final summary.",
+            ))
+            for index in range(agent_count - 1):
+                name = f"member_{index + 1}"
+                agents.append(agent(
+                    name, AgentRole.WORKER,
+                    f"You are group member {index + 1}. Contribute from your role, react to others, "
+                    "and help complete the task.",
+                ))
+            steps.append(WorkflowStep(id="group_chat", agent_name="lead"))
+        else:
+            for index in range(agent_count):
+                name = f"member_{index + 1}"
+                agents.append(agent(
+                    name, AgentRole.WORKER,
+                    f"You are group member {index + 1}. Contribute from your role, react to others, "
+                    "and help complete the task.",
+                ))
+            steps.append(WorkflowStep(id="group_chat", agent_name="member_1"))
         return agents, steps
 
     if pattern in (WorkflowPattern.HIERARCHICAL, WorkflowPattern.DYNAMIC):
@@ -316,14 +342,28 @@ async def create_workflow(request: WorkflowCreateRequest):
         except (UnsupportedPatternError, ValueError) as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-        agent_configs, workflow_steps = _build_pattern_agents(pattern, agent_count, model)
+        group_chat_lead = True
+        max_iterations = 10
+        if pattern == WorkflowPattern.GROUP_CHAT:
+            group_chat_config = request.config.get("group_chat")
+            if isinstance(group_chat_config, dict):
+                group_chat_lead = bool(group_chat_config.get("enable_lead", True))
+                try:
+                    max_turns = int(group_chat_config.get("max_turns", 12))
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="group_chat.max_turns must be an integer")
+                max_iterations = max(1, min(20, max_turns))
+
+        agent_configs, workflow_steps = _build_pattern_agents(
+            pattern, agent_count, model, group_chat_lead=group_chat_lead
+        )
 
         workflow_config = WorkflowConfig(
             name=request.name,
             pattern=pattern,
             steps=workflow_steps,
             agents=agent_configs,
-            max_iterations=10,
+            max_iterations=max_iterations,
         )
 
         executor = WorkflowExecutor(
