@@ -190,7 +190,8 @@ function syncGroupModels() {
   if (form.value.pattern !== 'group_chat') return
   const count = Math.max(1, form.value.enableLead ? form.value.agentCount - 1 : form.value.agentCount)
   const options = groupModelOptions.value
-  const fallback = options[0]?.value || 'openai/gpt-6.1-sol'
+  const preferred = options.find(option => option.value === 'openai/gpt-6.1-sol')?.value
+  const fallback = preferred || options[0]?.value || 'openai/gpt-6.1-sol'
   const valid = new Set(options.map(option => option.value))
   const current = [...(form.value.groupMemberModels || [])]
   form.value.groupMemberModels = Array.from({ length: count }, (_, index) => {
