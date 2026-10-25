@@ -1,9 +1,12 @@
 """group_chat 群聊模式：Lead、轮询、@点名与边界测试（假 Agent，离线）。"""
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
 
+from agentflow.adapters.base import LLMAdapter
+from agentflow.agents.llm_agent import LLMAgent
 from agentflow.core.agent import AgentConfig, AgentRole
 from agentflow.core.workflow import (
     WorkflowConfig,
@@ -237,6 +240,58 @@ async def test_group_chat_timeout_reports_step_error(monkeypatch):
     assert result["status"] == "failed"
     run = executor.get_run(result["run_id"])
     assert "timed out" in (run.error or "")
+
+
+class FakeToolAdapter(LLMAdapter):
+    """第一次返回原生 tool_calls，第二次返回最终答案。"""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def complete(self, messages, model="fake", temperature=0.7, max_tokens=2000, **kwargs):
+        self.calls += 1
+        if self.calls == 1 and kwargs.get("tools"):
+            return {
+                "content": None,
+                "model": "fake-tool",
+                "finish_reason": "tool_calls",
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "ask_agent",
+                        "arguments": json.dumps({"agent": "member_2", "task": "核对事实"}),
+                    },
+                }],
+            }
+        return {
+            "content": "基于工具结果的最终答案",
+            "model": "fake-tool",
+            "finish_reason": "stop",
+            "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+        }
+
+    async def stream_complete(self, messages, model="fake", **kwargs):
+        yield "x"
+
+
+@pytest.mark.asyncio
+async def test_group_chat_native_tool_calls_are_executed():
+    adapter = FakeToolAdapter()
+    caller = LLMAgent(AgentConfig(name="member_1", role=AgentRole.WORKER, model="fake",
+                                  system_prompt="you are member_1"), adapter)
+    target = ScriptedAgent("member_2", AgentRole.WORKER, ["核对结果"])
+    executor = build_executor([caller, target], max_iterations=1)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "completed"
+    assert adapter.calls == 2
+    assert target.calls
+    run = executor.get_run(result["run_id"])
+    assert any(step.step_id.startswith("native_tool_") for step in run.step_results)
+    assert "基于工具结果的最终答案" in (result["result"]["final_result"] or "")
 
 
 @pytest.mark.asyncio

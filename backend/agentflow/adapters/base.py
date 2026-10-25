@@ -5,6 +5,27 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 
+def serialize_tool_calls(message: Any) -> Optional[List[Dict[str, Any]]]:
+    """把 OpenAI SDK message.tool_calls 转成可序列化字典；无工具调用返回 None。"""
+    calls = getattr(message, "tool_calls", None)
+    if not calls:
+        return None
+    serialized: List[Dict[str, Any]] = []
+    for call in calls:
+        function = getattr(call, "function", None)
+        if function is None:
+            continue
+        serialized.append({
+            "id": getattr(call, "id", ""),
+            "type": getattr(call, "type", "function"),
+            "function": {
+                "name": getattr(function, "name", ""),
+                "arguments": getattr(function, "arguments", "") or "{}",
+            },
+        })
+    return serialized or None
+
+
 class LLMAdapter(ABC):
     """LLM 适配器基类"""
 

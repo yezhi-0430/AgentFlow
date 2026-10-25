@@ -2,7 +2,7 @@
 DeepSeek 适配器
 """
 from typing import Any, Dict, List, Optional
-from agentflow.adapters.base import LLMAdapter
+from agentflow.adapters.base import LLMAdapter, serialize_tool_calls
 
 
 class DeepSeekAdapter(LLMAdapter):
@@ -67,6 +67,7 @@ class DeepSeekAdapter(LLMAdapter):
             },
             "model": response.model,
             "finish_reason": response.choices[0].finish_reason,
+            "tool_calls": serialize_tool_calls(response.choices[0].message),
         }
 
     async def stream_complete(

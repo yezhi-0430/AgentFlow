@@ -3,7 +3,7 @@ OpenRouter 适配器 - 统一的多模型调用接口
 支持 OpenAI, Anthropic, DeepSeek 等所有模型通过 OpenRouter 调用
 """
 from typing import Any, Dict, List, Optional
-from agentflow.adapters.base import LLMAdapter
+from agentflow.adapters.base import LLMAdapter, serialize_tool_calls
 
 
 class OpenRouterAdapter(LLMAdapter):
@@ -133,6 +133,7 @@ class OpenRouterAdapter(LLMAdapter):
             },
             "model": response.model,
             "finish_reason": response.choices[0].finish_reason,
+            "tool_calls": serialize_tool_calls(response.choices[0].message),
         }
 
     async def stream_complete(

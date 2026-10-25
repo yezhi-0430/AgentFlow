@@ -1,8 +1,8 @@
 # AgentFlow 基线报告
 
-- 生成时间：2026-10-25T15:49:50+08:00
+- 生成时间：2026-10-25T16:00:31+08:00
 - 生成命令：`cd backend && python scripts/run_baseline.py`（本报告由脚本基于本次实际运行自动生成）
-- 代码版本：commit `19f970502a1d`，分支 `main`，工作区 dirty=True（改动文件数 4）
+- 代码版本：commit `acb575a8ecc6`，分支 `main`，工作区 dirty=True（改动文件数 12）
 - 运行环境：Python 3.13.12 / Windows-11-10.0.22631-SP0 / 解释器 `D:\conda\python.exe`
 - 版本冻结：数据集 `agentflow-fixed-v2@2.0.0`，配置 `1.0.0`，评分器 `2.0.0`，judge `deterministic`
 
@@ -16,9 +16,9 @@
 
 命令：`D:\conda\python.exe -m pytest tests/ -q`（cwd=`backend`）
 
-结果：**217 passed, 0 failed, 0 error, 0 skipped**；退出码 `0`，耗时 26.27s。
+结果：**218 passed, 0 failed, 0 error, 0 skipped**；退出码 `0`，耗时 26.12s。
 
-摘要行：`217 passed in 26.27s`
+摘要行：`218 passed in 26.12s`
 
 本次 pytest 输出尾部（截取）：
 
@@ -26,8 +26,8 @@
 ........................................................................ [ 33%]
 ........................................................................ [ 66%]
 ........................................................................ [ 99%]
-.                                                                        [100%]
-217 passed in 26.27s
+..                                                                       [100%]
+218 passed in 26.12s
 ```
 
 ### A2. 补充确定性断言（独立于 pytest，本轮实跑）
@@ -40,14 +40,14 @@
 | 预期答案覆盖全部固定 case 且评分器版本一致 | 通过 | {"answers_present": true, "scorer_version": "2.0.0", "answer_case_count": 10, "missing_case_ids": [], "unused_case_ids": []} |
 | 三种配置（single/sequential/parallel）定义齐全 | 通过 | {"config_version": "1.0.0", "configs": ["parallel", "sequential", "single"], "missing": [], "unexpected": []} |
 | 实验配置只使用引擎支持的 sequential/parallel 模式 | 通过 | {"engine_patterns": {"single": "sequential", "sequential": "sequential", "parallel": "parallel"}, "note": "single 是实验层名称，底层为 1 步 sequential；未支持模式不会进入实验配置。"} |
-| 引擎冒烟：single 配置可执行、有输出且可评分 | 通过 | {"case_id": "case-001", "status": "completed", "output_chars": 41, "score": 1.0, "elapsed_seconds": 0.0702, "total_tokens": 33, "adapter": "scripted-fake-v1"} |
+| 引擎冒烟：single 配置可执行、有输出且可评分 | 通过 | {"case_id": "case-001", "status": "completed", "output_chars": 41, "score": 1.0, "elapsed_seconds": 0.0602, "total_tokens": 33, "adapter": "scripted-fake-v1"} |
 | 假适配器确定性：同一输入两次运行输出/token/评分一致 | 通过 | {"output_equal": true, "tokens": [33, 33], "scores": [1.0, 1.0]} |
 | 运行器默认不启用真实模型（mode=fake、network=false） | 通过 | {"mode": "fake", "network": false, "real_gate_env": "AGENTFLOW_EXPERIMENT_REAL", "real_gate_set": false} |
 | 运行记录满足版本化契约（schema_version/run_id/trace_id/attempts/error_type/用量类型） | 通过 | {"backend_record_schema_version": 4, "record_schema_version": 4, "run_id_present": true, "trace_id": null, "tracing_enabled": false, "step_fields": ["agent_name", "attempts", "duration_seconds", "error", "error_type", "finish_reason", "input_chars", "model", "output_excerpt", "status", "step_id", "step_index", "total_tokens", "usage_type", "usage_unknown"], "step_usage_type": "actual", "attempts": 1, "error_type": null} |
 | 引擎支持全部 7 种模式且拒绝未知模式 | 通过 | {"patterns": ["sequential", "parallel", "hierarchical", "debate", "voting", "dynamic", "group_chat"], "unknown_rejected": true} |
 
 检查通过：**11/11**。
-引擎冒烟（single，case=case-001）：状态 `completed`，输出 41 字符，得分 1.0，token=33，耗时 0.0702s，记录 schema_version=4；假适配器确定性复跑一致=True。
+引擎冒烟（single，case=case-001）：状态 `completed`，输出 41 字符，得分 1.0，token=33，耗时 0.0602s，记录 schema_version=4；假适配器确定性复跑一致=True。
 
 ## B. 假模型质量实验（本次实跑）
 
@@ -66,9 +66,9 @@
 
 | 配置 | 用例数 | 完成 | 部分 | 失败 | 执行成功率 | 已评分 | 缺失评分 | 评分错误 | judge关闭 | 通过 | 通过率(已评分) | 通过率(全部用例) | 平均分(已评分) | 总耗时(s) | 平均耗时(s) | 总token | 平均token/case | 未知用量step数 | trace_id数 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| single | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.5707 | 0.0571 | 304 | 30.4 | 0 | 0 |
-| sequential | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.7725 | 0.0772 | 618 | 61.8 | 0 | 0 |
-| parallel | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.5666 | 0.0567 | 608 | 60.8 | 0 | 0 |
+| single | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.6219 | 0.0622 | 304 | 30.4 | 0 | 0 |
+| sequential | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.7131 | 0.0713 | 618 | 61.8 | 0 | 0 |
+| parallel | 10 | 10 | 0 | 0 | 100.0% | 10 | 0 | 0 | 0 | 8 | 80.0% | 80.0% | 0.8333 | 0.6196 | 0.0620 | 608 | 60.8 | 0 | 0 |
 
 说明：`通过率(已评分)` 的分母是成功产出且评分的 case；`通过率(全部用例)` 的分母是全部 case，缺失评分、评分错误、执行失败、judge 关闭都按“未通过”计入，不会只统计成功案例。
 
@@ -76,36 +76,36 @@
 
 | 配置 | case_id | run_id | trace_id | 执行状态 | 工作流状态 | schema | attempts | error_type | 耗时(s) | token | usage_type | 分数 | 通过 | critical缺失 | 评分异常 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| single | case-001 | ae4d5ca9 | — | completed | completed | 4 | 1 | — | 0.0548 | 33 | actual | 1 | 是 |  | — |
-| single | case-002 | cecf61c3 | — | completed | completed | 4 | 1 | — | 0.0522 | 27 | actual | 1 | 是 |  | — |
-| single | case-003 | a3db7a30 | — | completed | completed | 4 | 1 | — | 0.0641 | 28 | actual | 0.3333 | 否 | r1,r2 | — |
-| single | case-004 | 965ba94b | — | completed | completed | 4 | 1 | — | 0.0585 | 29 | actual | 1 | 是 |  | — |
-| single | case-005 | eeb01d65 | — | completed | completed | 4 | 1 | — | 0.0673 | 36 | actual | 1 | 是 |  | — |
-| single | case-006 | aca949f7 | — | completed | completed | 4 | 1 | — | 0.0531 | 38 | actual | 1 | 是 |  | — |
-| single | case-007 | 145ea0b5 | — | completed | completed | 4 | 1 | — | 0.0460 | 27 | actual | 1 | 是 |  | — |
-| single | case-008 | c21204a8 | — | completed | completed | 4 | 1 | — | 0.0525 | 24 | actual | 1 | 是 |  | — |
-| single | case-009 | 152d5a17 | — | completed | completed | 4 | 1 | — | 0.0602 | 31 | actual | 0 | 否 | r1 | — |
-| single | case-010 | 3e23911a | — | completed | completed | 4 | 1 | — | 0.0620 | 31 | actual | 1 | 是 |  | — |
-| sequential | case-001 | e2f6c6c9 | — | completed | completed | 4 | 1 | — | 0.0787 | 69 | actual | 1 | 是 |  | — |
-| sequential | case-002 | 5b5effad | — | completed | completed | 4 | 1 | — | 0.0881 | 57 | actual | 1 | 是 |  | — |
-| sequential | case-003 | 05ef1cee | — | completed | completed | 4 | 1 | — | 0.0686 | 58 | actual | 0.3333 | 否 | r1,r2 | — |
-| sequential | case-004 | 49388a76 | — | completed | completed | 4 | 1 | — | 0.0745 | 51 | actual | 1 | 是 |  | — |
-| sequential | case-005 | 4e830828 | — | completed | completed | 4 | 1 | — | 0.0838 | 70 | actual | 1 | 是 |  | — |
-| sequential | case-006 | 2653f3a2 | — | completed | completed | 4 | 1 | — | 0.0820 | 90 | actual | 1 | 是 |  | — |
-| sequential | case-007 | d1537b4f | — | completed | completed | 4 | 1 | — | 0.0817 | 57 | actual | 1 | 是 |  | — |
-| sequential | case-008 | 7925e511 | — | completed | completed | 4 | 1 | — | 0.0730 | 42 | actual | 1 | 是 |  | — |
-| sequential | case-009 | 44f32a62 | — | completed | completed | 4 | 1 | — | 0.0635 | 59 | actual | 0 | 否 | r1 | — |
-| sequential | case-010 | 11b7524c | — | completed | completed | 4 | 1 | — | 0.0786 | 65 | actual | 1 | 是 |  | — |
-| parallel | case-001 | f59e79a5 | — | completed | completed | 4 | 1 | — | 0.0651 | 66 | actual | 1 | 是 |  | — |
-| parallel | case-002 | 0018f84a | — | completed | completed | 4 | 1 | — | 0.0499 | 54 | actual | 1 | 是 |  | — |
-| parallel | case-003 | e68971b9 | — | completed | completed | 4 | 1 | — | 0.0442 | 56 | actual | 0.3333 | 否 | r1,r2 | — |
-| parallel | case-004 | cd76e023 | — | completed | completed | 4 | 1 | — | 0.0513 | 58 | actual | 1 | 是 |  | — |
-| parallel | case-005 | a4ffb2d8 | — | completed | completed | 4 | 1 | — | 0.0601 | 72 | actual | 1 | 是 |  | — |
-| parallel | case-006 | f17923c5 | — | completed | completed | 4 | 1 | — | 0.0658 | 76 | actual | 1 | 是 |  | — |
-| parallel | case-007 | f77b7988 | — | completed | completed | 4 | 1 | — | 0.0618 | 54 | actual | 1 | 是 |  | — |
-| parallel | case-008 | 11c778a6 | — | completed | completed | 4 | 1 | — | 0.0581 | 48 | actual | 1 | 是 |  | — |
-| parallel | case-009 | 7bc24bcb | — | completed | completed | 4 | 1 | — | 0.0509 | 62 | actual | 0 | 否 | r1 | — |
-| parallel | case-010 | 2b85e20d | — | completed | completed | 4 | 1 | — | 0.0594 | 62 | actual | 1 | 是 |  | — |
+| single | case-001 | 6d6ae2b2 | — | completed | completed | 4 | 1 | — | 0.0628 | 33 | actual | 1 | 是 |  | — |
+| single | case-002 | 87dfa1f1 | — | completed | completed | 4 | 1 | — | 0.0526 | 27 | actual | 1 | 是 |  | — |
+| single | case-003 | dae052d5 | — | completed | completed | 4 | 1 | — | 0.0743 | 28 | actual | 0.3333 | 否 | r1,r2 | — |
+| single | case-004 | f8cf19f6 | — | completed | completed | 4 | 1 | — | 0.0544 | 29 | actual | 1 | 是 |  | — |
+| single | case-005 | c96b97de | — | completed | completed | 4 | 1 | — | 0.0581 | 36 | actual | 1 | 是 |  | — |
+| single | case-006 | 59fed87c | — | completed | completed | 4 | 1 | — | 0.0759 | 38 | actual | 1 | 是 |  | — |
+| single | case-007 | 0714d788 | — | completed | completed | 4 | 1 | — | 0.0624 | 27 | actual | 1 | 是 |  | — |
+| single | case-008 | 52230b65 | — | completed | completed | 4 | 1 | — | 0.0593 | 24 | actual | 1 | 是 |  | — |
+| single | case-009 | 20c82fa4 | — | completed | completed | 4 | 1 | — | 0.0643 | 31 | actual | 0 | 否 | r1 | — |
+| single | case-010 | b5f1c69d | — | completed | completed | 4 | 1 | — | 0.0578 | 31 | actual | 1 | 是 |  | — |
+| sequential | case-001 | 9a2955e8 | — | completed | completed | 4 | 1 | — | 0.0797 | 69 | actual | 1 | 是 |  | — |
+| sequential | case-002 | 57b9888d | — | completed | completed | 4 | 1 | — | 0.0760 | 57 | actual | 1 | 是 |  | — |
+| sequential | case-003 | 0b8e6f1d | — | completed | completed | 4 | 1 | — | 0.0637 | 58 | actual | 0.3333 | 否 | r1,r2 | — |
+| sequential | case-004 | 7dd4b929 | — | completed | completed | 4 | 1 | — | 0.0734 | 51 | actual | 1 | 是 |  | — |
+| sequential | case-005 | e4626b99 | — | completed | completed | 4 | 1 | — | 0.0650 | 70 | actual | 1 | 是 |  | — |
+| sequential | case-006 | 5135a695 | — | completed | completed | 4 | 1 | — | 0.0751 | 90 | actual | 1 | 是 |  | — |
+| sequential | case-007 | 2789d75f | — | completed | completed | 4 | 1 | — | 0.0705 | 57 | actual | 1 | 是 |  | — |
+| sequential | case-008 | df51559a | — | completed | completed | 4 | 1 | — | 0.0663 | 42 | actual | 1 | 是 |  | — |
+| sequential | case-009 | b2325213 | — | completed | completed | 4 | 1 | — | 0.0674 | 59 | actual | 0 | 否 | r1 | — |
+| sequential | case-010 | 4a3a1033 | — | completed | completed | 4 | 1 | — | 0.0760 | 65 | actual | 1 | 是 |  | — |
+| parallel | case-001 | bee878cf | — | completed | completed | 4 | 1 | — | 0.0677 | 66 | actual | 1 | 是 |  | — |
+| parallel | case-002 | 958e01be | — | completed | completed | 4 | 1 | — | 0.0570 | 54 | actual | 1 | 是 |  | — |
+| parallel | case-003 | 4c2ea148 | — | completed | completed | 4 | 1 | — | 0.0576 | 56 | actual | 0.3333 | 否 | r1,r2 | — |
+| parallel | case-004 | 8954ed0c | — | completed | completed | 4 | 1 | — | 0.0467 | 58 | actual | 1 | 是 |  | — |
+| parallel | case-005 | aaba133f | — | completed | completed | 4 | 1 | — | 0.0595 | 72 | actual | 1 | 是 |  | — |
+| parallel | case-006 | f6fce10f | — | completed | completed | 4 | 1 | — | 0.0722 | 76 | actual | 1 | 是 |  | — |
+| parallel | case-007 | 44693daa | — | completed | completed | 4 | 1 | — | 0.0746 | 54 | actual | 1 | 是 |  | — |
+| parallel | case-008 | 0526ce7a | — | completed | completed | 4 | 1 | — | 0.0666 | 48 | actual | 1 | 是 |  | — |
+| parallel | case-009 | fd3e1675 | — | completed | completed | 4 | 1 | — | 0.0633 | 62 | actual | 0 | 否 | r1 | — |
+| parallel | case-010 | 199e7233 | — | completed | completed | 4 | 1 | — | 0.0544 | 62 | actual | 1 | 是 |  | — |
 
 ### B3. 评分记录完整性
 

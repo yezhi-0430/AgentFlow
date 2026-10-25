@@ -3,7 +3,7 @@ Claude 适配器 - OpenRouter 兼容格式
 使用 OpenAI SDK 调用，完全兼容 OpenRouter
 """
 from typing import Any, Dict, List, Optional
-from agentflow.adapters.base import LLMAdapter
+from agentflow.adapters.base import LLMAdapter, serialize_tool_calls
 
 
 class ClaudeAdapter(LLMAdapter):
@@ -74,6 +74,7 @@ class ClaudeAdapter(LLMAdapter):
             },
             "model": response.model,
             "finish_reason": response.choices[0].finish_reason,
+            "tool_calls": serialize_tool_calls(response.choices[0].message),
         }
 
     async def stream_complete(

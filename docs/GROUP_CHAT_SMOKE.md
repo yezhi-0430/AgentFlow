@@ -78,6 +78,22 @@
 
 超时错误现在会写入 run.error，而不是只显示笼统的“没有回复”。
 
+## 真实模型原生 function calling 冒烟
+
+- 模式：`group_chat`，无 Lead，2 个成员
+- 模型：`openai/gpt-4o-mini`
+- 任务：要求 member_1 使用 `ask_agent` 工具请 member_2 核对 tuple 是否可变，再基于结果回答
+- 结果：
+
+| 项目 | 结果 |
+| --- | --- |
+| 执行状态 | `completed` |
+| token | 1,826 |
+| 原生工具步骤 | `native_tool_1_member_1_member_2` |
+| 行为 | 模型直接返回 `tool_calls`，执行器调用 member_2，把结果回传给 member_1，member_1 给出最终回答 |
+
+说明：除执行器中介的 JSON 工具协议外，群聊成员现在也支持 **OpenAI 兼容的 native function calling**（`tool_calls`）。
+
 ## 真实模型工具边界冒烟
 
 | 场景 | 结果 | token | 工具步骤 |

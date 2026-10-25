@@ -64,6 +64,40 @@ MAX_AGENTS_BY_PATTERN = {
 }
 MAX_RUNS_IN_MEMORY = 50
 MAX_GROUP_TOOL_CALLS = 3
+GROUP_CHAT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "ask_agent",
+            "description": "Ask another member of this group chat to do a focused task, then return the result.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agent": {"type": "string", "description": "Target member name"},
+                    "task": {"type": "string", "description": "Concrete task for the target member"},
+                },
+                "required": ["agent", "task"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "handoff_to",
+            "description": "Hand a part of the work to another member of this group chat.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "agent": {"type": "string", "description": "Target member name"},
+                    "task": {"type": "string", "description": "Concrete task for the target member"},
+                },
+                "required": ["agent", "task"],
+                "additionalProperties": False,
+            },
+        },
+    },
+]
 PARALLEL_STOP_POLL_INTERVAL = 0.05
 TERMINAL_STATUSES = {
     RunStatus.COMPLETED,
@@ -1549,6 +1583,58 @@ class WorkflowExecutor:
             transcript.append((caller_name, follow["content"] or ""))
         return True, index, tool_calls, True
 
+    def _make_group_native_handler(
+        self,
+        *,
+        caller_name: str,
+        task: str,
+        member_names: List[str],
+        transcript: List[Tuple[str, str]],
+        run: WorkflowRun,
+        trace,
+        index: int,
+        state: Dict[str, Any],
+    ):
+        """构造原生 function calling 的工具处理器。"""
+
+        async def handler(name: str, args: Dict[str, Any]) -> str:
+            if name not in ("ask_agent", "handoff_to"):
+                state["failed"] = True
+                return f"Tool error: unknown tool {name}"
+            target = str((args or {}).get("agent") or "").strip()
+            tool_task = str((args or {}).get("task") or "").strip()
+            if target not in member_names or not tool_task:
+                state["failed"] = True
+                return "Tool error: agent must be a member and task must be non-empty"
+            if state["calls"] >= MAX_GROUP_TOOL_CALLS:
+                state["failed"] = True
+                return "Tool error: group tool call budget exhausted"
+            target_agent = self.agents.get(target)
+            if target_agent is None:
+                state["failed"] = True
+                return f"Tool error: agent not found: {target}"
+            state["calls"] += 1
+            outcome = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"native_tool_{state['calls']}_{caller_name}_{target}", agent_name=target),
+                agent=target_agent, input_text=(
+                    f"{task}\n\n[群聊记录]\n"
+                    + ("\n\n".join(f"[{speaker}] {text}" for speaker, text in transcript[-16:]) or "（尚无发言）")
+                    + f"\n\n[工具调用 {name}] {caller_name} 请求 {target}：{tool_task}\n"
+                    "请完成这个请求，并把结果返回给调用者。"
+                ),
+                run=run, trace=trace, index=index + 100 + state["calls"],
+                sender=caller_name, receiver=target, response_receiver=caller_name,
+                message_content=f"[工具] {caller_name} → {target}: {tool_task}",
+            )
+            if not outcome["ok"]:
+                state["failed"] = True
+                return f"Tool error: {outcome.get('error') or 'tool execution failed'}"
+            result = outcome["content"] or ""
+            transcript.append((target, result))
+            return result
+
+        return handler
+
     async def _execute_group_chat(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
         """受控 Agent 群聊：Lead 可选；共享 transcript；最多 max_iterations 轮。
 
@@ -1644,13 +1730,29 @@ class WorkflowExecutor:
                     f"如需另一位成员协助，可只输出 JSON：{{\"tool\": \"ask_agent\", "
                     f"\"agent\": \"成员名\", \"task\": \"...\"}}；可用成员：{', '.join(member_names)}。"
                 )
-                reply = await self._execute_recorded_step(
-                    step=WorkflowStep(id=f"turn_{turn}_{next_name}", agent_name=next_name),
-                    agent=member, input_text=member_input, run=run, trace=trace, index=index,
-                    sender=lead_name, receiver=next_name, response_receiver="group",
-                    message_content=subtask,
-                )
+                native_state = {"calls": 0, "failed": False}
+                if hasattr(member, "tools"):
+                    member.tools = GROUP_CHAT_TOOLS
+                    member.tool_handler = self._make_group_native_handler(
+                        caller_name=next_name, task=task, member_names=member_names,
+                        transcript=transcript, run=run, trace=trace, index=index,
+                        state=native_state,
+                    )
+                try:
+                    reply = await self._execute_recorded_step(
+                        step=WorkflowStep(id=f"turn_{turn}_{next_name}", agent_name=next_name),
+                        agent=member, input_text=member_input, run=run, trace=trace, index=index,
+                        sender=lead_name, receiver=next_name, response_receiver="group",
+                        message_content=subtask,
+                    )
+                finally:
+                    if hasattr(member, "tools"):
+                        member.tools = None
+                        member.tool_handler = None
                 index += 1
+                tool_calls += native_state["calls"]
+                if native_state["failed"]:
+                    had_failure = True
                 if reply["ok"]:
                     remember(next_name, reply["content"] or "")
                     handled, index, tool_calls, tool_ok = await self._execute_group_tool(
@@ -1720,13 +1822,29 @@ class WorkflowExecutor:
                 "如需另一位成员协助，可只输出 JSON：{\"tool\": \"ask_agent\", \"agent\": \"成员名\", \"task\": \"...\"}。"
                 + handoff_note
             )
-            outcome = await self._execute_recorded_step(
-                step=WorkflowStep(id=f"turn_{turn}_{speaker}", agent_name=speaker),
-                agent=agent, input_text=group_input, run=run, trace=trace, index=index,
-                sender="group", receiver=speaker, response_receiver="group",
-                message_content="请继续群聊，补充观点或推进任务",
-            )
+            native_state = {"calls": 0, "failed": False}
+            if hasattr(agent, "tools"):
+                agent.tools = GROUP_CHAT_TOOLS
+                agent.tool_handler = self._make_group_native_handler(
+                    caller_name=speaker, task=task, member_names=member_names,
+                    transcript=transcript, run=run, trace=trace, index=index,
+                    state=native_state,
+                )
+            try:
+                outcome = await self._execute_recorded_step(
+                    step=WorkflowStep(id=f"turn_{turn}_{speaker}", agent_name=speaker),
+                    agent=agent, input_text=group_input, run=run, trace=trace, index=index,
+                    sender="group", receiver=speaker, response_receiver="group",
+                    message_content="请继续群聊，补充观点或推进任务",
+                )
+            finally:
+                if hasattr(agent, "tools"):
+                    agent.tools = None
+                    agent.tool_handler = None
             index += 1
+            tool_calls += native_state["calls"]
+            if native_state["failed"]:
+                had_failure = True
             if outcome["ok"]:
                 content = outcome["content"] or ""
                 remember(speaker, content)
