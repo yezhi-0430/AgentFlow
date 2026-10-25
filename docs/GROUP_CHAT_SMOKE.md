@@ -20,7 +20,7 @@
 | Lead 行为 | 输出合法 JSON，选择 `member_1` 并给出子任务 |
 | 成员行为 | 围绕原始任务回答 list/tuple 区别与场景 |
 | Lead 收尾 | 输出 `{"done": true, "summary": "..."}`，与成员回答一致 |
-| 失败/重试 | 0 次工具/执行失败；本脚本未启用追踪 |
+| 失败/重试 | 0 次执行失败；本脚本未启用追踪 |
 
 ## 结论
 
@@ -28,7 +28,27 @@
 样本只有 2 个 Agent、1 轮任务，不能说明群聊质量稳定；多轮/多人/不同模型仍需重复验证。
 
 > 本次冒烟只验证“Lead 分派 + 成员回答 + Lead 收尾”。
-> 执行器中介的 `ask_agent` / `handoff_to` 工具协议已用假 Agent 单测覆盖，尚未用真实模型验证。
+> 执行器中介的 `ask_agent` / `handoff_to` 工具协议已用假 Agent 单测覆盖，并另做了一次真实模型工具冒烟（见下）。
+
+## 真实模型工具冒烟（ask_agent）
+
+- 模式：`group_chat`，`enable_lead=false`（纯成员群聊）
+- 模型：`openai/gpt-4o-mini`
+- 智能体：`member_1`、`member_2`
+- `max_turns=2`
+- 任务：要求 member_1 先用 `ask_agent` 请 member_2 核对 list/tuple 事实，再基于结果回答
+- 结果：
+
+| 项目 | 结果 |
+| --- | --- |
+| 执行状态 | `completed` |
+| 消息数 | 6 |
+| 总 token | 990 |
+| 工具步骤 | `tool_1_member_1_member_2`、`tool_followup_1_member_1` |
+| 结果 | member_1 输出合法 ask_agent JSON → member_2 返回 tuple 不可变 → member_1 基于结果给出最终回答 |
+
+这说明工具协议不仅是假 Agent 单测，真实模型也能按 JSON 协议触发并被执行器正确路由。
+仍未做多轮/多工具/非法工具参数的真实模型验证。
 
 ## 冒烟中发现并修复的问题
 
@@ -42,5 +62,5 @@
 
 - 仅一次冒烟，未做多轮重复/多人/不同模型对比；
 - 未启用 Langfuse（避免外部写入），trace_id 为空；
-- 未做工具调用或自动 RSI；
+- 未做自动 RSI；
 - 真实模型费用很小但不为零（约千级 token）。
