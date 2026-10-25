@@ -70,8 +70,8 @@
                 <div class="gc-bubble-wrap">
                   <header class="gc-bubble-meta">
                     <strong>{{ item.sender }}</strong>
-                    <span v-if="item.model" class="gc-model">{{ modelLabel(item.model) }}</span>
-                    <span v-if="item.role && item.kind !== 'system'" class="gc-role">{{ item.role }}</span>
+                    <span v-if="item.model" class="gc-model">{{ modelLabel(item.sender === leadName ? leadModel : item.model) }}</span>
+                    <span v-if="item.kind !== 'system'" class="gc-role">{{ item.sender === leadName ? 'coordinator' : item.role }}</span>
                     <time>{{ formatTime(item.timestamp) }}</time>
                   </header>
                   <div class="gc-bubble" :style="item.kind === 'system' ? {} : bubbleStyleFor(item.model, item.sender)">
@@ -166,6 +166,7 @@ const groupWorkflows = computed(() => (workflowStore.workflows || []).filter(wor
 const selected = computed(() => groupWorkflows.value.find(workflow => workflow.workflow_id === selectedId.value) || null)
 const members = computed(() => selected.value?.agents || [])
 const leadName = computed(() => members.value.find(member => member.role === 'coordinator')?.name || 'lead')
+const leadModel = computed(() => members.value.find(member => member.name === leadName.value)?.model || '')
 const membersText = computed(() => members.value.length ? members.value.map(member => member.name).join('、') : '共享群聊')
 const keyLabel = computed(() => {
   const provider = selected.value?.connection?.provider || 'openrouter'
@@ -460,13 +461,13 @@ onBeforeUnmount(clearPoll)
 .gc-empty-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 16px; }
 .gc-empty-chips span { padding: 3px 8px; border: 1px solid #e2e2e2; border-radius: 999px; background: #fff; color: #666; font-size: 10px; }
 .gc-message { animation: gc-message-in 260ms cubic-bezier(.22, 1, .36, 1); }
-.gc-message.is-lead { margin-left: auto; flex-direction: row-reverse; }
+.gc-message.is-lead { margin-left: auto; flex-direction: row-reverse; width: fit-content; max-width: 78%; }
 .gc-message.is-lead .gc-bubble-wrap { align-items: flex-end; }
 .gc-message.is-lead .gc-bubble-meta { justify-content: flex-end; }
 .gc-message.is-lead .gc-bubble { border-bottom-left-radius: 14px; border-bottom-right-radius: 4px; }
 .gc-message.is-lead .gc-bubble p, .gc-message.is-lead .gc-bubble summary { color: #fff; }
 .gc-message.is-lead .gc-bubble pre { color: #d6d6d6; }
-.gc-message.is-lead.system { max-width: 88%; justify-content: flex-end; margin-left: auto; }
+.gc-message.is-lead.system { width: fit-content; max-width: 88%; justify-content: flex-end; margin-left: auto; }
 .gc-message.is-lead.system .gc-bubble { text-align: right; }
 .gc-message.is-lead.system .gc-bubble { background: #191919; border: 1px solid #191919; color: #fff; }
 .gc-message.is-lead.system .gc-bubble p { color: #fff; }
