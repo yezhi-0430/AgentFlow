@@ -63,19 +63,23 @@
               <div v-if="item.type === 'divider'" class="gc-run-divider">
                 <span>第 {{ runIndex(item.runId) }} 次运行</span>
               </div>
-              <article v-else class="gc-message" :class="item.kind">
+              <article v-else class="gc-message" :class="[item.kind, { 'is-lead': item.sender === leadName, 'is-internal': item.kind === 'internal' }]">
                 <div class="gc-avatar" :style="{ background: avatarFor(item.sender, item.model).color }">
                   {{ avatarFor(item.sender, item.model).initials }}
                 </div>
                 <div class="gc-bubble-wrap">
                   <header class="gc-bubble-meta">
                     <strong>{{ item.sender }}</strong>
-                    <span v-if="item.kind !== 'system' && item.model" class="gc-model">{{ modelLabel(item.model) }}</span>
-                    <span v-if="item.kind !== 'system' && item.role" class="gc-role">{{ item.role }}</span>
+                    <span v-if="item.model" class="gc-model">{{ modelLabel(item.model) }}</span>
+                    <span v-if="item.role && item.kind !== 'system'" class="gc-role">{{ item.role }}</span>
                     <time>{{ formatTime(item.timestamp) }}</time>
                   </header>
-                  <div class="gc-bubble">
-                    <details v-if="item.kind === 'tool' && item.rawContent" class="gc-tool-details">
+                  <div class="gc-bubble" :style="item.kind === 'system' ? {} : bubbleStyleFor(item.model, item.sender)">
+                    <details v-if="item.kind === 'internal'" class="gc-internal-details">
+                      <summary>内部规划 · 点击展开</summary>
+                      <pre>{{ item.rawContent || item.content }}</pre>
+                    </details>
+                    <details v-else-if="item.kind === 'tool' && item.rawContent" class="gc-tool-details">
                       <summary>{{ item.content }}</summary>
                       <pre>{{ item.rawContent }}</pre>
                     </details>
@@ -84,13 +88,13 @@
                 </div>
               </article>
             </template>
-            <article v-if="typing" class="gc-message chat typing">
+            <article v-if="typing" class="gc-message chat typing" :class="{ 'is-lead': activeAgent === leadName }">
               <div class="gc-avatar" :style="{ background: avatarFor(activeAgent, activeModel).color }">
                 {{ avatarFor(activeAgent, activeModel).initials }}
               </div>
               <div class="gc-bubble-wrap">
                 <header class="gc-bubble-meta"><strong>{{ activeAgent }}</strong><span class="gc-model">{{ modelLabel(activeModel) }}</span></header>
-                <div class="gc-bubble"><p>正在发言<span class="gc-dots">…</span></p></div>
+                <div class="gc-bubble" :style="bubbleStyleFor(activeModel, activeAgent)"><p>正在发言<span class="gc-dots">…</span></p></div>
               </div>
             </article>
           </div>
@@ -137,7 +141,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { useWorkflowStore } from '../stores/workflow'
 import { messageService, workflowService } from '../services/workflow'
-import { formatChatTime, isGroupChatTerminal, normalizeGroupChatMessages } from '../utils/groupChat'
+import { bubbleStyleFor, formatChatTime, isGroupChatTerminal, normalizeGroupChatMessages } from '../utils/groupChat'
 import { avatarFor } from '../utils/avatars'
 
 const props = defineProps({ workflowId: { type: String, default: '' } })
@@ -161,6 +165,7 @@ let requestToken = 0
 const groupWorkflows = computed(() => (workflowStore.workflows || []).filter(workflow => workflow.pattern === 'group_chat'))
 const selected = computed(() => groupWorkflows.value.find(workflow => workflow.workflow_id === selectedId.value) || null)
 const members = computed(() => selected.value?.agents || [])
+const leadName = computed(() => members.value.find(member => member.role === 'coordinator')?.name || 'lead')
 const membersText = computed(() => members.value.length ? members.value.map(member => member.name).join('、') : '共享群聊')
 const keyLabel = computed(() => {
   const provider = selected.value?.connection?.provider || 'openrouter'
@@ -222,7 +227,7 @@ async function loadMessages({ before, silent = false } = {}) {
   const token = requestToken
   if (!workflowId) return
   try {
-    const data = await messageService.getMessages(workflowId, before ? { before, limit: 50 } : { limit: 50 })
+    const data = await messageService.getMessages(workflowId, before ? { before, limit: 50, include_internal: true } : { limit: 50, include_internal: true })
     if (token !== requestToken || workflowId !== selectedId.value) return
     const incoming = normalizeGroupChatMessages(data?.messages || []).filter(message => message.kind)
     const shouldScroll = !silent && nearBottom()
@@ -330,8 +335,11 @@ async function stop() {
   }
 }
 
-watch(() => props.workflowId, workflowId => {
-  if (workflowId && workflowId !== selectedId.value) selectWorkflow(workflowId)
+watch(() => props.workflowId, async workflowId => {
+  if (workflowId && workflowId !== selectedId.value) {
+    await workflowStore.loadWorkflows()
+    await selectWorkflow(workflowId)
+  }
 })
 
 onMounted(async () => {
@@ -451,4 +459,20 @@ onBeforeUnmount(clearPoll)
 .gc-avatar-stack .gc-avatar { margin: 0 -5px; border: 3px solid #f6f6f6; }
 .gc-empty-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 16px; }
 .gc-empty-chips span { padding: 3px 8px; border: 1px solid #e2e2e2; border-radius: 999px; background: #fff; color: #666; font-size: 10px; }
+.gc-message { animation: gc-message-in 260ms cubic-bezier(.22, 1, .36, 1); }
+.gc-message.is-lead { margin-left: auto; flex-direction: row-reverse; }
+.gc-message.is-lead .gc-bubble-wrap { align-items: flex-end; }
+.gc-message.is-lead .gc-bubble-meta { justify-content: flex-end; }
+.gc-message.is-lead .gc-bubble { border-bottom-left-radius: 14px; border-bottom-right-radius: 4px; }
+.gc-message.is-lead .gc-bubble p, .gc-message.is-lead .gc-bubble summary { color: #fff; }
+.gc-message.is-lead .gc-bubble pre { color: #d6d6d6; }
+.gc-message.is-lead.system { max-width: 88%; justify-content: flex-end; margin-left: auto; }
+.gc-message.is-lead.system .gc-bubble { text-align: right; }
+.gc-message.is-lead.system .gc-bubble { background: #191919; border: 1px solid #191919; color: #fff; }
+.gc-message.is-lead.system .gc-bubble p { color: #fff; }
+.gc-message.is-internal { max-width: 92%; }
+.gc-internal-details summary { cursor: pointer; color: #666; font-weight: 600; }
+.gc-internal-details pre { margin: 8px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; color: #666; font: 11px/1.5 ui-monospace, Consolas, monospace; }
+.gc-message.is-lead .gc-internal-details summary, .gc-message.is-lead .gc-internal-details pre { color: #d6d6d6; }
+@keyframes gc-message-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 </style>

@@ -38,21 +38,6 @@
                 <div v-if="form.pattern === 'group_chat'" class="form-group group-chat-settings">
                   <label class="group-chat-lead"><input v-model="form.enableLead" type="checkbox" :disabled="creating" /> 启用 Lead Agent</label>
                   <p class="hint">开启后由 Lead 规划、分派并总结；关闭后成员轮流发言，可用 @成员名 点名。</p>
-                  <div class="group-model-grid">
-                    <div v-for="(member, index) in form.groupMemberModels" :key="index" class="form-group group-model-row">
-                      <label :for="`group-model-${index}`">成员 {{ index + 1 }}</label>
-                      <input v-model="member.name" type="text" class="group-member-name" :disabled="creating" aria-label="成员名称" />
-                      <AppSelect :id="`group-model-${index}`" v-model="member.model" label="成员模型" :options="groupModelOptions" :disabled="creating" />
-                      <input v-model="member.customModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 model id（可选）" aria-label="自定义成员模型" />
-                    </div>
-                    <div v-if="form.enableLead" class="form-group group-model-row">
-                      <label for="group-lead-model">Lead 模型</label>
-                      <AppSelect id="group-lead-model" v-model="form.leadModel" label="Lead 模型" :options="groupModelOptions" :disabled="creating" />
-                      <input v-model="form.leadCustomModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 Lead model id（可选）" aria-label="自定义 Lead 模型" />
-                    </div>
-                  </div>
-                  <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型，也可填写自定义 model id。</p>
-                  <p v-if="catalogSource === 'fallback'" class="hint">模型目录服务暂不可用，当前显示精选模型；可直接填写自定义 model id。</p>
                 </div>
               </section>
 
@@ -78,6 +63,25 @@
                   </div>
                 </Transition>
                 <div v-if="form.llmProvider === 'local'" class="creation-local-note"><AppIcon name="terminal" :size="18" /><p>当前后端尚未支持本地模型，请选择在线模型提供商。</p></div>
+
+                <div v-if="form.pattern === 'group_chat'" class="form-group group-chat-model-settings">
+                  <div class="creation-section-heading group-model-heading"><span class="creation-section-number">03</span><div><h3>群聊模型</h3><p>为每个成员和 Lead 选择模型</p></div></div>
+                  <div class="group-model-grid">
+                    <div v-for="(member, index) in form.groupMemberModels" :key="index" class="form-group group-model-row">
+                      <label :for="`group-model-${index}`">成员 {{ index + 1 }}</label>
+                      <input v-model="member.name" type="text" class="group-member-name" :disabled="creating" aria-label="成员名称" />
+                      <AppSelect :id="`group-model-${index}`" v-model="member.model" label="成员模型" :options="groupModelOptions" :disabled="creating" />
+                      <input v-model="member.customModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 model id（可选）" aria-label="自定义成员模型" />
+                    </div>
+                    <div v-if="form.enableLead" class="form-group group-model-row">
+                      <label for="group-lead-model">Lead 模型</label>
+                      <AppSelect id="group-lead-model" v-model="form.leadModel" label="Lead 模型" :options="groupModelOptions" :disabled="creating" />
+                      <input v-model="form.leadCustomModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 Lead model id（可选）" aria-label="自定义 Lead 模型" />
+                    </div>
+                  </div>
+                  <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型，也可填写自定义 model id。</p>
+                  <p v-if="catalogSource === 'fallback'" class="hint">模型目录服务暂不可用，当前显示精选模型；可直接填写自定义 model id。</p>
+                </div>
 
                 <div class="creation-summary">
                   <h4><AppIcon name="layers" :size="16" />本次工作流</h4>

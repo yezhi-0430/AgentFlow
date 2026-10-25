@@ -1,12 +1,14 @@
 <template>
+  <Transition name="page-slide" mode="out-in">
   <GroupChatPage
     v-if="groupChatOpen"
+    key="group-chat"
     :workflow-id="groupChatWorkflowId"
     @close="closeGroupChat"
     @create="onGroupCreate"
     @select="onGroupSelect"
   />
-  <div v-else class="app-shell" :class="{ 'is-focused': focusMode, 'is-resizing-timeline': timelineResizing }">
+  <div v-else key="workspace" class="app-shell" :class="{ 'is-focused': focusMode, 'is-resizing-timeline': timelineResizing }">
     <nav class="navigation-rail" aria-label="工作台导航">
       <button class="sidebar-brand" aria-label="返回工作流画布" @click="canvas?.fit()">
         <span class="brand-mark"><AppIcon name="flow" :size="22" /></span>
@@ -93,9 +95,10 @@
       </main>
       <footer class="app-footer"><span><span class="status-dot"></span>{{ workflowStore.currentWorkflow ? '工作流已载入' : '工作空间就绪' }}</span><span class="shortcut-hints"><kbd>N</kbd> 新建工作流 <kbd>F</kbd> 专注模式 <kbd>Esc</kbd> 退出专注</span></footer>
     </div>
-    <CreateWorkflowDialog v-model="showCreateWorkflow" :preset="creationPreset" @created="onCreated" />
     <WorkflowLibraryDialog v-model="showWorkflowLibrary" @imported="onImported" @selected="onWorkflowSelected" />
   </div>
+  </Transition>
+  <CreateWorkflowDialog v-model="showCreateWorkflow" :preset="creationPreset" @created="onCreated" />
   <Toast ref="toast" />
   <LoadingOverlay ref="loading" />
   <ConfirmDialog ref="confirm" />
@@ -186,7 +189,6 @@ function onGroupSelect(workflowId) {
   window.history.replaceState({ groupChat: true }, '', groupChatHash(workflowId))
 }
 function onGroupCreate() {
-  closeGroupChat()
   openCreateWorkflow({ pattern: 'group_chat' })
 }
 function syncGroupChatFromHash() {

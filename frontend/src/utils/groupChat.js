@@ -29,7 +29,7 @@ function parseLeadPayload(content) {
 export function classifyGroupMessage(message) {
   if (!message || typeof message !== 'object') return null
   const visibility = message.metadata?.visibility
-  if (visibility === 'internal') return null
+  if (visibility === 'internal') return 'internal'
   const content = String(message.content ?? '').trim()
   const payload = parseLeadPayload(content)
   if (payload) return payload.done === true && payload.summary ? 'system' : null
@@ -40,6 +40,24 @@ export function classifyGroupMessage(message) {
   return 'chat'
 }
 
+const BUBBLE_COLORS = [
+  ['#ffffff', '#e6e6e6'],
+  ['#f2f7ff', '#d7e5fb'],
+  ['#f3fbf6', '#d3ecdc'],
+  ['#fff8ed', '#f1dfc2'],
+  ['#faf4ff', '#e5d8f7'],
+  ['#fff3f3', '#f0d5d5'],
+  ['#f2fbfb', '#d0e8e8'],
+]
+
+export function bubbleStyleFor(model = '', sender = '') {
+  let hash = 0
+  for (const char of `${model}|${sender}`) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  if (sender === 'lead') return { background: '#191919', borderColor: '#191919', color: '#fff' }
+  const [background, borderColor] = BUBBLE_COLORS[hash % BUBBLE_COLORS.length]
+  return { background, borderColor, color: '#191919' }
+}
+
 export function formatGroupChatMessage(message) {
   if (!message || typeof message !== 'object') return null
   const display = message.metadata && typeof message.metadata.display_content === 'string'
@@ -48,13 +66,17 @@ export function formatGroupChatMessage(message) {
   let content = display || (typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? ''))
   if (!content.trim()) return null
   let forcedKind = null
-  const payload = parseLeadPayload(content)
-  if (payload) {
-    if (payload.done === true && payload.summary) {
-      content = String(payload.summary)
-      forcedKind = 'system'
-    } else {
-      return null
+  if (message.metadata?.visibility === 'internal') {
+    forcedKind = 'internal'
+  } else {
+    const payload = parseLeadPayload(content)
+    if (payload) {
+      if (payload.done === true && payload.summary) {
+        content = String(payload.summary)
+        forcedKind = 'system'
+      } else {
+        return null
+      }
     }
   }
   const sender = message.sender || 'system'

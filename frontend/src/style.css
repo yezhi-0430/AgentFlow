@@ -332,3 +332,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Page-level slide transition for workspace <-> group chat */
+.page-slide-enter-active,
+.page-slide-leave-active { transition: opacity 220ms ease, transform 260ms cubic-bezier(.22, 1, .36, 1); }
+.page-slide-enter-from { opacity: 0; transform: translateX(30px); }
+.page-slide-leave-to { opacity: 0; transform: translateX(-22px); }
+.pattern-card, .group, .select-trigger, .btn, .rail-button { transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms var(--ease); }
