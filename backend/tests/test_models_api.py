@@ -10,9 +10,11 @@ from agentflow.api.routes import models
 def clear_cache():
     models._cache["expires_at"] = 0
     models._cache["payload"] = None
+    models._cache["retry_after"] = 0
     yield
     models._cache["expires_at"] = 0
     models._cache["payload"] = None
+    models._cache["retry_after"] = 0
 
 
 @pytest.fixture

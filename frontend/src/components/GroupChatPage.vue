@@ -47,8 +47,17 @@
             <button v-if="hasEarlier" class="gc-earlier" type="button" @click="loadEarlier">
               加载更早消息
             </button>
-            <div v-if="!timeline.length" class="gc-messages-empty">
-              <p>输入任务后开始群聊；每轮发言会显示在这里。</p>
+            <div v-if="!timeline.length" class="gc-empty-chat">
+              <div class="gc-avatar-stack">
+                <div v-for="member in members.slice(0, 4)" :key="member.name" class="gc-avatar" :style="{ background: avatarFor(member.name, member.model).color }">
+                  {{ avatarFor(member.name, member.model).initials }}
+                </div>
+              </div>
+              <h2>开始一场多模型讨论</h2>
+              <p>每个成员使用不同模型，Lead 负责分派与总结。输入任务后，他们的讨论会显示在这里。</p>
+              <div class="gc-empty-chips">
+                <span v-for="member in members" :key="member.name">{{ modelLabel(member.model) }}</span>
+              </div>
             </div>
             <template v-for="item in timeline" :key="item.id">
               <div v-if="item.type === 'divider'" class="gc-run-divider">
@@ -66,7 +75,11 @@
                     <time>{{ formatTime(item.timestamp) }}</time>
                   </header>
                   <div class="gc-bubble">
-                    <p>{{ item.content }}</p>
+                    <details v-if="item.kind === 'tool' && item.rawContent" class="gc-tool-details">
+                      <summary>{{ item.content }}</summary>
+                      <pre>{{ item.rawContent }}</pre>
+                    </details>
+                    <p v-else>{{ item.content }}</p>
                   </div>
                 </div>
               </article>
@@ -89,7 +102,7 @@
               v-model="apiKey"
               type="password"
               class="gc-key"
-              placeholder="重新输入 OpenRouter API Key"
+              :placeholder="`重新输入 ${keyLabel} API Key`"
               autocomplete="off"
             />
             <textarea v-model="task" rows="2" placeholder="输入群聊任务，例如：讨论并给出这个功能的设计方案" :disabled="running"></textarea>
@@ -149,6 +162,10 @@ const groupWorkflows = computed(() => (workflowStore.workflows || []).filter(wor
 const selected = computed(() => groupWorkflows.value.find(workflow => workflow.workflow_id === selectedId.value) || null)
 const members = computed(() => selected.value?.agents || [])
 const membersText = computed(() => members.value.length ? members.value.map(member => member.name).join('、') : '共享群聊')
+const keyLabel = computed(() => {
+  const provider = selected.value?.connection?.provider || 'openrouter'
+  return { openrouter: 'OpenRouter', openai: 'OpenAI', anthropic: 'Anthropic', deepseek: 'DeepSeek' }[provider] || provider
+})
 const messages = computed(() => rawMessages.value.filter(message => message.kind))
 const timeline = computed(() => {
   const items = []
@@ -392,4 +409,46 @@ onBeforeUnmount(clearPoll)
   .gc-body { grid-template-columns: 180px minmax(0, 1fr); }
   .gc-members { display: none; }
 }
+
+/* Align the full-screen page with AgentFlow's white/black workbench theme. */
+.gc-page { background: #fff; color: #191919; }
+.gc-header { background: #fff; border-bottom-color: #e8e8e8; }
+.gc-back { color: #191919; }
+.gc-title p, .gc-status, .gc-sidebar-heading, .gc-member small { color: #838383; }
+.gc-body { background: #fff; }
+.gc-sidebar { background: #fff; border-right-color: #e8e8e8; }
+.gc-members { background: #fff; border-left-color: #e8e8e8; }
+.gc-room { background: #f6f6f6; }
+.gc-group { border: 1px solid transparent; }
+.gc-group:hover { background: #f6f6f6; }
+.gc-group.selected { background: #191919; color: #fff; border-color: #191919; }
+.gc-group.selected small { color: #c9c9c9; }
+.gc-group-avatar { background: #191919; border-radius: 7px; }
+.gc-group.selected .gc-group-avatar { background: #fff; color: #191919; }
+.gc-messages { scrollbar-width: thin; scrollbar-color: #c9c9c9 transparent; overscroll-behavior: contain; scroll-behavior: smooth; }
+.gc-messages::-webkit-scrollbar { width: 8px; }
+.gc-messages::-webkit-scrollbar-thumb { background: #d2d2d2; border-radius: 999px; }
+.gc-bubble { background: #fff; border: 1px solid #ededed; box-shadow: 0 1px 2px #00000008; }
+.gc-model { background: #f0f0f0; color: #444; }
+.gc-message.system .gc-bubble { background: transparent; border: 0; box-shadow: none; color: #838383; }
+.gc-message.tool .gc-bubble { background: #fff; border: 1px dashed #cfcfcf; }
+.gc-tool-details summary { cursor: pointer; color: #191919; font-weight: 600; }
+.gc-tool-details pre { margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; color: #666; font: 11px/1.5 ui-monospace, Consolas, monospace; }
+.gc-run-divider { color: #9a9a9a; }
+.gc-run-divider::before, .gc-run-divider::after { background: #e2e2e2; }
+.gc-earlier { border-color: #dedede; color: #191919; background: #fff; }
+.gc-composer { background: #fff; border-top-color: #e8e8e8; }
+.gc-composer textarea, .gc-key { border-color: #dedede; background: #fff; }
+.gc-composer textarea:focus, .gc-key:focus { outline: none; border-color: #191919; box-shadow: 0 0 0 3px #1919190d; }
+.gc-composer-actions .btn-primary { background: #191919; border-color: #191919; color: #fff; }
+.gc-header-actions .btn-secondary { background: #191919; border-color: #191919; color: #fff; }
+.gc-header-actions .btn-secondary:hover { background: #333; }
+.gc-lead { background: #191919; }
+.gc-empty-chat { margin: auto; max-width: 430px; padding: 36px 22px; text-align: center; color: #666; }
+.gc-empty-chat h2 { margin: 16px 0 6px; color: #191919; font-size: 17px; }
+.gc-empty-chat p { margin: 0; line-height: 1.8; font-size: 12px; }
+.gc-avatar-stack { display: flex; justify-content: center; }
+.gc-avatar-stack .gc-avatar { margin: 0 -5px; border: 3px solid #f6f6f6; }
+.gc-empty-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 16px; }
+.gc-empty-chips span { padding: 3px 8px; border: 1px solid #e2e2e2; border-radius: 999px; background: #fff; color: #666; font-size: 10px; }
 </style>

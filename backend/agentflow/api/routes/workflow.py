@@ -171,6 +171,7 @@ def _workflow_summary(workflow_id: str, executor: WorkflowExecutor) -> Dict[str,
         "pattern": executor.config.pattern.value,
         "status": executor.status,
         "requires_credentials": executor.requires_credentials,
+        "connection": executor.connection or {},
         "agents": _agent_summaries(executor),
     }
 

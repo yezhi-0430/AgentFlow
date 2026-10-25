@@ -104,5 +104,10 @@ export const modelOptions = {
     { value: 'qwen/qwen-2.5-72b-instruct', label: 'Qwen 2.5 72B', description: 'qwen/qwen-2.5-72b-instruct' },
     { value: 'x-ai/grok-2-1212', label: 'Grok 2', description: 'x-ai/grok-2-1212' },
     { value: 'mistralai/mistral-large', label: 'Mistral Large', description: 'mistralai/mistral-large' },
+    { value: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', description: 'meta-llama/llama-3.3-70b-instruct' },
+    { value: 'moonshotai/kimi-k2', label: 'Kimi K2', description: 'moonshotai/kimi-k2' },
+    { value: 'z-ai/glm-4.5', label: 'GLM 4.5', description: 'z-ai/glm-4.5' },
+    { value: 'minimax/minimax-m2', label: 'MiniMax M2', description: 'minimax/minimax-m2' },
+    { value: 'cohere/command-a', label: 'Command A', description: 'cohere/command-a' },
   ],
 }

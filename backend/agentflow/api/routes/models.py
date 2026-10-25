@@ -8,7 +8,7 @@ from fastapi import APIRouter
 router = APIRouter()
 
 _CACHE_TTL_SECONDS = 600
-_cache: Dict[str, Any] = {"expires_at": 0.0, "payload": None}
+_cache: Dict[str, Any] = {"expires_at": 0.0, "payload": None, "retry_after": 0.0}
 
 FALLBACK_MODELS: List[Dict[str, Any]] = [
     {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "OpenAI",
@@ -25,6 +25,16 @@ FALLBACK_MODELS: List[Dict[str, Any]] = [
      "context_length": 131072, "pricing": {}, "supports_tools": True},
     {"id": "mistralai/mistral-large", "name": "Mistral Large", "provider": "Mistral",
      "context_length": 128000, "pricing": {}, "supports_tools": True},
+    {"id": "meta-llama/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "provider": "Meta",
+     "context_length": 128000, "pricing": {}, "supports_tools": True},
+    {"id": "moonshotai/kimi-k2", "name": "Kimi K2", "provider": "Moonshot",
+     "context_length": 128000, "pricing": {}, "supports_tools": True},
+    {"id": "z-ai/glm-4.5", "name": "GLM 4.5", "provider": "Zhipu",
+     "context_length": 128000, "pricing": {}, "supports_tools": True},
+    {"id": "minimax/minimax-m2", "name": "MiniMax M2", "provider": "MiniMax",
+     "context_length": 128000, "pricing": {}, "supports_tools": True},
+    {"id": "cohere/command-a", "name": "Command A", "provider": "Cohere",
+     "context_length": 256000, "pricing": {}, "supports_tools": True},
 ]
 
 
@@ -59,6 +69,8 @@ async def list_openrouter_models():
     now = time.time()
     if _cache["payload"] is not None and now < _cache["expires_at"]:
         return _cache["payload"]
+    if now < _cache["retry_after"]:
+        return {"models": FALLBACK_MODELS, "source": "fallback"}
 
     try:
         models = await _fetch_openrouter_models()
@@ -67,6 +79,8 @@ async def list_openrouter_models():
         result = {"models": models, "source": "remote"}
         _cache["payload"] = result
         _cache["expires_at"] = now + _CACHE_TTL_SECONDS
+        _cache["retry_after"] = 0.0
         return result
     except Exception:
+        _cache["retry_after"] = now + 60
         return {"models": FALLBACK_MODELS, "source": "fallback"}

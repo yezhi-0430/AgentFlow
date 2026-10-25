@@ -52,6 +52,7 @@
                     </div>
                   </div>
                   <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型，也可填写自定义 model id。</p>
+                  <p v-if="catalogSource === 'fallback'" class="hint">模型目录服务暂不可用，当前显示精选模型；可直接填写自定义 model id。</p>
                 </div>
               </section>
 
@@ -125,6 +126,7 @@ const showApiKey = ref(false)
 const dialog = ref(null)
 const nameInput = ref(null)
 const modelCatalog = ref([])
+const catalogSource = ref('')
 let previousFocus = null
 let previousOverflow = ''
 let disposed = false
@@ -181,8 +183,10 @@ async function loadModelCatalog() {
   try {
     const data = await modelService.getOpenRouterModels()
     modelCatalog.value = data?.models || []
+    catalogSource.value = data?.source || ''
   } catch {
     modelCatalog.value = []
+    catalogSource.value = 'fallback'
   }
   syncGroupModels()
 }

@@ -65,6 +65,7 @@ export function formatGroupChatMessage(message) {
     sender,
     receiver,
     content,
+    rawContent: typeof message.content === 'string' ? message.content : '',
     timestamp,
     metadata: message.metadata || {},
     model: message.metadata?.model || '',

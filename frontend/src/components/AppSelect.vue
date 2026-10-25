@@ -13,7 +13,17 @@
         <div v-if="open" :id="listId" ref="panel" class="select-popover" :class="{ 'opens-above': above }"
           :style="position" role="listbox" :aria-label="label">
           <div class="select-menu-caption">{{ label }}</div>
-          <div v-for="(option, index) in options" :id="optionId(index)" :key="option.value" role="option"
+          <input
+            ref="searchInput"
+            v-model="filter"
+            class="select-search"
+            type="search"
+            :placeholder="`搜索${label}`"
+            aria-label="搜索选项"
+            @click.stop
+            @keydown.stop
+          />
+          <div v-for="(option, index) in filteredOptions" :id="optionId(index)" :key="option.value" role="option"
             class="select-option" :class="{ 'is-active': active === index, 'is-selected': option.value === modelValue }"
             :aria-selected="option.value === modelValue" @pointermove="active = index" @pointerdown.prevent @click="choose(index)">
             <span v-if="option.symbol" class="select-symbol">{{ option.symbol }}</span>
@@ -47,8 +57,19 @@ const open = ref(false)
 const active = ref(-1)
 const above = ref(false)
 const position = ref({})
+const filter = ref('')
+const searchInput = ref(null)
 const listId = computed(() => props.id + '-listbox')
 const selected = computed(() => props.options.find(option => option.value === props.modelValue))
+const filteredOptions = computed(() => {
+  const query = filter.value.trim().toLowerCase()
+  if (!query) return props.options
+  return props.options.filter(option =>
+    String(option.label || '').toLowerCase().includes(query)
+    || String(option.value || '').toLowerCase().includes(query)
+    || String(option.description || '').toLowerCase().includes(query)
+  )
+})
 let search = ''
 let searchTimer
 const optionId = index => props.id + '-option-' + index
@@ -59,7 +80,7 @@ function updatePosition() {
   if (bounds.bottom < 0 || bounds.top > window.innerHeight) { open.value = false; return }
   const below = window.innerHeight - bounds.bottom - 12
   const upper = bounds.top - 12
-  const desired = Math.min(340, props.options.length * 59 + 40)
+  const desired = Math.min(340, filteredOptions.value.length * 59 + 40)
   above.value = below < desired && upper > below
   const width = Math.min(bounds.width, window.innerWidth - 24)
   position.value = {
@@ -83,14 +104,16 @@ async function scrollActive() {
 }
 function show() {
   if (props.disabled || !props.options.length) return
-  active.value = Math.max(0, props.options.findIndex(option => option.value === props.modelValue))
+  filter.value = ''
+  active.value = Math.max(0, filteredOptions.value.findIndex(option => option.value === props.modelValue))
   open.value = true
   updatePosition()
   scrollActive()
+  nextTick(() => searchInput.value?.focus({ preventScroll: true }))
 }
 function toggle() { if (open.value) open.value = false; else show() }
 function choose(index) {
-  const option = props.options[index]
+  const option = filteredOptions.value[index]
   if (!option) return
   emit('update:modelValue', option.value)
   open.value = false
@@ -108,8 +131,8 @@ function onKeydown(event) {
     event.preventDefault()
     if (!open.value) {
       show()
-      if (event.key === 'Home' || event.key === 'End') active.value = moveOptionIndex(active.value, props.options.length, event.key)
-    } else active.value = moveOptionIndex(active.value, props.options.length, event.key)
+      if (event.key === 'Home' || event.key === 'End') active.value = moveOptionIndex(active.value, filteredOptions.value.length, event.key)
+    } else active.value = moveOptionIndex(active.value, filteredOptions.value.length, event.key)
     scrollActive()
     return
   }
@@ -123,8 +146,8 @@ function onKeydown(event) {
     if (!open.value) show()
     clearTimeout(searchTimer)
     search += event.key
-    let match = findOptionMatch(props.options, search, active.value)
-    if (match < 0) { search = event.key; match = findOptionMatch(props.options, search, active.value) }
+    let match = findOptionMatch(filteredOptions.value, search, active.value)
+    if (match < 0) { search = event.key; match = findOptionMatch(filteredOptions.value, search, active.value) }
     if (match >= 0) { active.value = match; scrollActive() }
     searchTimer = setTimeout(() => { search = '' }, 550)
   }
@@ -143,9 +166,16 @@ watch(open, isOpen => {
     removeListeners()
     clearTimeout(searchTimer)
     search = ''
+    filter.value = ''
   }
 })
+watch(filter, () => { active.value = 0; scrollActive() })
 watch(() => props.disabled, disabled => { if (disabled) open.value = false })
-watch(() => props.options, () => { if (open.value) { active.value = Math.max(0, props.options.findIndex(option => option.value === props.modelValue)); updatePosition(); scrollActive() } })
+watch(() => props.options, () => { if (open.value) { active.value = Math.max(0, filteredOptions.value.findIndex(option => option.value === props.modelValue)); updatePosition(); scrollActive() } })
 onBeforeUnmount(() => { removeListeners(); clearTimeout(searchTimer) })
 </script>
+
+<style scoped>
+.select-search { width: calc(100% - 20px); margin: 0 10px 8px; padding: 7px 9px; border: 1px solid #d9d9d9; border-radius: 6px; font: inherit; font-size: 12px; outline: none; }
+.select-search:focus { border-color: #191919; }
+</style>

@@ -149,24 +149,36 @@ const canvas = ref(null)
 const toast = ref(null)
 const confirm = ref(null)
 const historyPanel = ref(null)
-const groupChatOpen = ref(window.location.hash.startsWith('#group-chat'))
+const groupChatOpen = ref(isGroupChatHash(window.location.hash))
 const groupChatWorkflowId = ref(window.location.hash.split('/')[1] || '')
+let groupChatPushed = false
 const { height: timelineHeight, minHeight: timelineMinHeight, maxHeight: timelineMaxHeight, resizing: timelineResizing, beginResize: beginTimelineResize, moveResize: moveTimelineResize, endResize: endTimelineResize, onResizeKey: onTimelineResizeKey, resetHeight: resetTimelineHeight, fitViewport: fitTimelineViewport } = useTimelineResize()
 const patternName = computed(() => workflowPatternLabels[workflowStore.currentWorkflow?.pattern] || '未设置模式')
 
+function isGroupChatHash(hash) {
+  return hash === '#group-chat' || hash.startsWith('#group-chat/')
+}
 function groupChatHash(workflowId = '') {
   return workflowId ? `#group-chat/${workflowId}` : '#group-chat'
 }
 function openGroupChat(workflowId = '') {
   groupChatOpen.value = true
   groupChatWorkflowId.value = workflowId
-  window.history.pushState({ groupChat: true }, '', groupChatHash(workflowId))
+  if (!isGroupChatHash(window.location.hash)) {
+    window.history.pushState({ groupChat: true }, '', groupChatHash(workflowId))
+    groupChatPushed = true
+  } else {
+    window.history.replaceState({ groupChat: true }, '', groupChatHash(workflowId))
+  }
 }
 function closeGroupChat() {
   groupChatOpen.value = false
   groupChatWorkflowId.value = ''
-  if (window.location.hash.startsWith('#group-chat')) {
-    window.history.pushState({}, '', `${window.location.pathname}${window.location.search}`)
+  if (groupChatPushed) {
+    groupChatPushed = false
+    window.history.back()
+  } else if (isGroupChatHash(window.location.hash)) {
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`)
   }
 }
 function onGroupSelect(workflowId) {
@@ -178,8 +190,9 @@ function onGroupCreate() {
   openCreateWorkflow({ pattern: 'group_chat' })
 }
 function syncGroupChatFromHash() {
-  groupChatOpen.value = window.location.hash.startsWith('#group-chat')
+  groupChatOpen.value = isGroupChatHash(window.location.hash)
   groupChatWorkflowId.value = groupChatOpen.value ? (window.location.hash.split('/')[1] || '') : ''
+  if (!groupChatOpen.value) groupChatPushed = false
 }
 
 function handleShortcut(event) {
