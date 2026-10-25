@@ -524,7 +524,7 @@ onBeforeUnmount(clearPoll)
 @keyframes gc-message-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .gc-group-wrap { position: relative; display: flex; }
 .gc-group-wrap .gc-group { flex: 1; min-width: 0; }
-.gc-group-delete { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #999; opacity: 0; cursor: pointer; transition: opacity 160ms ease, background 160ms ease, color 160ms ease; }
+.gc-group-delete { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #999; opacity: .45; cursor: pointer; transition: opacity 160ms ease, background 160ms ease, color 160ms ease; }
 .gc-group-wrap:hover .gc-group-delete, .gc-group-delete:focus-visible { opacity: 1; }
 .gc-group-delete:hover { background: #e8e8e8; color: #191919; }
 .gc-group.selected + .gc-group-delete:hover { background: #fff; }
