@@ -199,16 +199,71 @@ async def get_providers():
     return {"providers": AdapterFactory.get_provider_info()}
 
 
+def _group_chat_specs(
+    config: Dict[str, Any], agent_count: int, default_model: str
+) -> tuple[Optional[str], List[Dict[str, str]]]:
+    """解析群聊多模型配置；旧配置没有 members 时返回 (None, [])。"""
+    group_chat = config.get("group_chat")
+    if not isinstance(group_chat, dict) or "members" not in group_chat:
+        return None, []
+
+    if config.get("llm_provider", "openai").lower() != "openrouter":
+        raise HTTPException(status_code=400, detail="group_chat requires OpenRouter when members are configured")
+
+    raw_members = group_chat.get("members")
+    if not isinstance(raw_members, list):
+        raise HTTPException(status_code=400, detail="group_chat.members must be a list")
+
+    enable_lead = bool(group_chat.get("enable_lead", True))
+    minimum = 1 if enable_lead else 2
+    maximum = 5 if enable_lead else 6
+    if not minimum <= len(raw_members) <= maximum:
+        raise HTTPException(
+            status_code=400,
+            detail=f"group_chat.members must contain {minimum}-{maximum} members",
+        )
+
+    members: List[Dict[str, str]] = []
+    seen = set()
+    for index, item in enumerate(raw_members):
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail=f"group_chat.members[{index}] must be an object")
+        name = str(item.get("name") or "").strip()
+        member_model = str(item.get("model") or "").strip()
+        if not name or not member_model:
+            raise HTTPException(status_code=400, detail=f"group_chat.members[{index}] requires name and model")
+        if name == "lead":
+            raise HTTPException(status_code=400, detail="group_chat member name 'lead' is reserved")
+        if name in seen:
+            raise HTTPException(status_code=400, detail=f"duplicate group_chat member name: {name}")
+        seen.add(name)
+        members.append({"name": name, "model": member_model})
+
+    lead_model = None
+    if enable_lead:
+        lead_model = str(group_chat.get("lead_model") or "").strip()
+        if not lead_model:
+            raise HTTPException(status_code=400, detail="group_chat.lead_model is required when enable_lead is true")
+
+    return lead_model, members
+
+
 def _build_pattern_agents(
-    pattern: WorkflowPattern, agent_count: int, model: str, *, group_chat_lead: bool = True
+    pattern: WorkflowPattern,
+    agent_count: int,
+    model: str,
+    *,
+    group_chat_lead: bool = True,
+    group_chat_config: Optional[Dict[str, Any]] = None,
+    llm_provider: str = "openai",
 ) -> tuple[List[AgentConfig], List[WorkflowStep]]:
     """按协作模式生成 Agent 配置与展示用步骤（密钥不进入配置）。"""
     agents: List[AgentConfig] = []
     steps: List[WorkflowStep] = []
 
-    def agent(name: str, role: AgentRole, prompt: str) -> AgentConfig:
+    def agent(name: str, role: AgentRole, prompt: str, model_override: Optional[str] = None) -> AgentConfig:
         return AgentConfig(
-            name=name, role=role, system_prompt=prompt, model=model,
+            name=name, role=role, system_prompt=prompt, model=model_override or model,
             temperature=0.7, max_tokens=2000,
         )
 
@@ -226,6 +281,35 @@ def _build_pattern_agents(
         return agents, steps
 
     if pattern == WorkflowPattern.GROUP_CHAT:
+        lead_model, member_specs = _group_chat_specs(
+            {"group_chat": group_chat_config or {}, "llm_provider": llm_provider},
+            agent_count,
+            model,
+        )
+        if member_specs:
+            if group_chat_lead:
+                agents.append(agent(
+                    "lead", AgentRole.COORDINATOR,
+                    "You are the lead of a group chat. The user's ORIGINAL TASK is the only goal; "
+                    "never invent projects, people, or unrelated topics. You MUST reply with a single "
+                    "JSON object only, no prose: {\"done\": false, \"next\": \"member_1\", \"task\": \"...\"} "
+                    "to assign the next member (next must be from the provided member list), or "
+                    "{\"done\": true, \"summary\": \"...\"} to finish. Produce the final summary.",
+                    model_override=lead_model,
+                ))
+            for index, spec in enumerate(member_specs, start=1):
+                agents.append(agent(
+                    spec["name"], AgentRole.WORKER,
+                    f"You are group member {index}. Contribute from your role, react to others, "
+                    "and help complete the task.",
+                    model_override=spec["model"],
+                ))
+            steps.append(WorkflowStep(
+                id="group_chat",
+                agent_name="lead" if group_chat_lead else member_specs[0]["name"],
+            ))
+            return agents, steps
+
         if group_chat_lead:
             agents.append(agent(
                 "lead", AgentRole.COORDINATOR,
@@ -341,14 +425,13 @@ async def create_workflow(request: WorkflowCreateRequest):
             )
         try:
             ensure_supported_pattern(pattern)
-            validate_pattern_agents(pattern, agent_count)
-        except (UnsupportedPatternError, ValueError) as e:
+        except UnsupportedPatternError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
         group_chat_lead = True
+        group_chat_config = request.config.get("group_chat")
         max_iterations = 10
         if pattern == WorkflowPattern.GROUP_CHAT:
-            group_chat_config = request.config.get("group_chat")
             if isinstance(group_chat_config, dict):
                 group_chat_lead = bool(group_chat_config.get("enable_lead", True))
                 try:
@@ -358,8 +441,17 @@ async def create_workflow(request: WorkflowCreateRequest):
                 max_iterations = max(1, min(20, max_turns))
 
         agent_configs, workflow_steps = _build_pattern_agents(
-            pattern, agent_count, model, group_chat_lead=group_chat_lead
+            pattern,
+            agent_count,
+            model,
+            group_chat_lead=group_chat_lead,
+            group_chat_config=group_chat_config,
+            llm_provider=llm_provider,
         )
+        try:
+            validate_pattern_agents(pattern, len(agent_configs))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
         workflow_config = WorkflowConfig(
             name=request.name,
