@@ -9,35 +9,24 @@ from agentflow.adapters.base import LLMAdapter, serialize_tool_calls
 class OpenRouterAdapter(LLMAdapter):
     """OpenRouter 统一适配器"""
 
-    # OpenRouter 支持的模型列表（精简版 - 只保留指定模型）
+    # OpenRouter 主流新模型别名；也支持直接传完整 model id。
     SUPPORTED_MODELS = {
-        # OpenAI 模型
-        "gpt-4o": "openai/gpt-4o",
-        "gpt-4o-mini": "openai/gpt-4o-mini",
-        "gpt-5": "openai/gpt-5",
-
-        # Anthropic 模型
-        "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet",
-        "claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
-        "claude-sonnet-4.5": "anthropic/claude-sonnet-4.5",
-
-        # Google 模型
-        "gemini-2.0-flash": "google/gemini-2.0-flash-001",
-        "gemini-2.5-pro": "google/gemini-2.5-pro",
-
-        # DeepSeek 模型
-        "deepseek-chat": "deepseek/deepseek-chat",
-        "deepseek-chat-v3.1": "deepseek/deepseek-chat-v3.1",
-
-        # Qwen / xAI / Mistral / Meta / Moonshot / Zhipu / MiniMax / Cohere
-        "qwen-2.5-72b": "qwen/qwen-2.5-72b-instruct",
-        "grok-2": "x-ai/grok-2-1212",
-        "mistral-large": "mistralai/mistral-large",
-        "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct",
-        "kimi-k2": "moonshotai/kimi-k2",
-        "glm-4.5": "z-ai/glm-4.5",
-        "minimax-m2": "minimax/minimax-m2",
-        "command-a": "cohere/command-a",
+        "gpt-6.1-sol": "openai/gpt-6.1-sol",
+        "gpt-6-luna": "openai/gpt-6-luna",
+        "claude-sonnet-5.5": "anthropic/claude-sonnet-5.5",
+        "claude-opus-5.5": "anthropic/claude-opus-5.5",
+        "gemini-4-argon": "google/gemini-4-argon",
+        "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash-1017",
+        "qwen3.8-max-prime": "qwen/qwen3.8-max-prime",
+        "grok-4.7": "x-ai/grok-4.7",
+        "mistral-large-4": "mistralai/mistral-large-4-0",
+        "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
+        "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
+        "glm-5.3-prime": "z-ai/glm-5.3-prime",
+        "command-a-plus": "cohere/command-a-plus",
+        "mimo-v2.6-pro": "xiaomi/mimo-v2.6-pro",
+        "muse-wonder": "meta/muse-wonder",
+        "nemotron-3.5-super-vl": "nvidia/nemotron-3.5-super-vl",
     }
 
     def __init__(

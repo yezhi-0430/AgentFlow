@@ -135,10 +135,32 @@ let previousFocus = null
 let previousOverflow = ''
 let disposed = false
 
+const MODEL_NOTES = {
+  'openai/gpt-6.1-sol': '旗舰综合 · 1.05M 上下文 · 适合 Lead/复杂规划',
+  'openai/gpt-6-luna': '低成本高吞吐 · 1.05M · 适合大量成员发言',
+  'anthropic/claude-sonnet-5.5': '推理/代码均衡 · 1M · 适合评审与实现',
+  'anthropic/claude-opus-5.5': '深度推理/长文写作 · 1M · 质量优先',
+  'google/gemini-4-argon': '原生多模态 · 1M · 图像/音频/搜索',
+  'deepseek/deepseek-v4.1-flash-1017': '极低成本高速度 · 1M · 适合并行成员',
+  'qwen/qwen3.8-max-prime': '中文/多语言强 · 1M · 适合产品讨论',
+  'x-ai/grok-4.7': '实时风格/搜索增强 · 500K · 观点碰撞',
+  'mistralai/mistral-large-4-0': '推理效率高 · 1M · 结构化输出',
+  'moonshotai/kimi-k3.1-pro': '中文长文档 · 1M · 资料整理',
+  'minimax/minimax-m3.1-flash': '低价快速 · 1M · 草稿/多轮',
+  'z-ai/glm-5.3-prime': '中文 Agent/代码 · 1M · 工具协作',
+  'cohere/command-a-plus': '企业 RAG/检索 · 192K · 知识库问答',
+  'xiaomi/mimo-v2.6-pro': '高性价比中文 · 1.05M · 成本敏感',
+  'meta/muse-wonder': '创意/多模态 · 1M · 头脑风暴',
+  'nvidia/nemotron-3.5-super-vl': '开源多模态 · 1M · 视觉资料',
+}
 const availableModels = computed(() => modelOptions[form.value.llmProvider] || [])
 const groupModelOptions = computed(() => {
   if (modelCatalog.value.length) {
-    return modelCatalog.value.map(model => ({ value: model.id, label: model.name, description: model.id }))
+    return modelCatalog.value.map(model => {
+      const context = model.context_length ? `${Math.round(model.context_length / 1000)}K` : ''
+      const detail = MODEL_NOTES[model.id] || [model.description, context && `${context} 上下文`, model.supports_tools && '工具调用'].filter(Boolean).join(' · ')
+      return { value: model.id, label: model.name, description: detail || model.id }
+    })
   }
   return modelOptions.openrouter || []
 })
@@ -168,7 +190,7 @@ function syncGroupModels() {
   if (form.value.pattern !== 'group_chat') return
   const count = Math.max(1, form.value.enableLead ? form.value.agentCount - 1 : form.value.agentCount)
   const options = groupModelOptions.value
-  const fallback = options[0]?.value || 'openai/gpt-4o'
+  const fallback = options[0]?.value || 'openai/gpt-6.1-sol'
   const valid = new Set(options.map(option => option.value))
   const current = [...(form.value.groupMemberModels || [])]
   form.value.groupMemberModels = Array.from({ length: count }, (_, index) => {
@@ -200,7 +222,7 @@ watch(() => form.value.pattern, pattern => {
   form.value.agentCount = clampAgentCount(pattern, form.value.agentCount)
   if (pattern === 'group_chat') {
     form.value.llmProvider = 'openrouter'
-    if (!form.value.model) form.value.model = groupModelOptions.value[0]?.value || 'openai/gpt-4o'
+    if (!form.value.model) form.value.model = groupModelOptions.value[0]?.value || 'openai/gpt-6.1-sol'
   }
   syncGroupModels()
 })
@@ -281,3 +303,4 @@ onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.sty
 .group-member-name { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 7px 8px; border: 1px solid #d9e2e1; border-radius: 7px; font: inherit; }
 @media (max-width: 720px) { .group-model-grid { grid-template-columns: 1fr; } }
 </style>
+

@@ -350,6 +350,7 @@ docs/                 开发、限制、基线与整理说明
 - [Harness²-lite 实施报告](docs/HARNESS2_LITE_REPORT.md)
 - [群聊真实模型冒烟](docs/GROUP_CHAT_SMOKE.md)
 - [群聊多模型与全屏页冒烟](docs/GROUP_CHAT_MULTIMODEL_SMOKE.md)
+- [群聊模型目录与特点](docs/MODEL_CATALOG.md)
 - [Harness²-lite 设计/决策清单](docs/HARNESS2_LITE_PLAN.md)
 - [Harness²-lite 假模型对比](docs/HARNESS2_COMPARISON.md)
 - [Harness²-lite 真实模型对比（一次受控）](docs/HARNESS2_REAL_COMPARISON.md)

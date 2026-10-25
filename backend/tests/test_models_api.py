@@ -49,6 +49,9 @@ def test_openrouter_models_fallback(client, monkeypatch):
     assert data["source"] == "fallback"
     assert len(data["models"]) >= 6
     assert all({"id", "name", "provider"} <= set(item) for item in data["models"])
+    assert all(item.get("description") for item in data["models"])
+    assert any(item["id"] == "openai/gpt-6.1-sol" for item in data["models"])
+    assert not any(item["id"] in {"openai/gpt-4o", "anthropic/claude-3.5-sonnet"} for item in data["models"])
 
 
 def test_openrouter_models_are_cached(client, monkeypatch):
