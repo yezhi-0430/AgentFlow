@@ -8,8 +8,11 @@ from agentflow.api.routes import workflow
 
 class FakeAdapter:
     async def complete(self, messages, model, **kwargs):
-        return {"content": f"processed: {messages[-1]['content']}", "model": model,
-                "usage": {"total_tokens": 10}}
+        return {
+            "content": f"processed: {messages[-1]['content']}",
+            "model": model,
+            "usage": {"total_tokens": 10},
+        }
 
 
 @pytest.fixture
@@ -32,6 +35,7 @@ def _multi_model_payload():
             "group_chat": {
                 "enable_lead": True,
                 "lead_model": "anthropic/claude-sonnet-4.5",
+                "max_turns": 1,
                 "members": [
                     {"name": "member_1", "model": "openai/gpt-5"},
                     {"name": "member_2", "model": "google/gemini-2.5-pro"},
@@ -100,7 +104,48 @@ def test_group_chat_allows_lead_plus_one_member(client):
                    "model": "openai/gpt-5",
                    "group_chat": {"enable_lead": True,
                                   "lead_model": "anthropic/claude-sonnet-4.5",
+                                  "max_turns": 1,
                                   "members": [{"name": "member_1", "model": "openai/gpt-5"}]}},
     })
     assert response.status_code == 200, response.text
     assert len(response.json()["agents"]) == 2
+
+
+def _execute(client, workflow_id, task="task"):
+    response = client.post(f"/api/workflows/{workflow_id}/execute", json={"task": task})
+    assert response.status_code == 200, response.text
+    return client.get(f"/api/workflows/{workflow_id}/status").json()
+
+
+def test_messages_hide_internal_by_default(client):
+    response = _create(client, _multi_model_payload())
+    assert response.status_code == 200, response.text
+    workflow_id = response.json()["workflow_id"]
+    _execute(client, workflow_id)
+    visible = client.get("/api/messages", params={"workflow_id": workflow_id}).json()["messages"]
+    assert all(m["metadata"].get("visibility") != "internal" for m in visible)
+    hidden = client.get(
+        "/api/messages",
+        params={"workflow_id": workflow_id, "include_internal": True},
+    ).json()["messages"]
+    assert any(m["metadata"].get("visibility") == "internal" for m in hidden)
+
+
+def test_messages_keep_history_across_runs(client):
+    response = _create(client, _multi_model_payload())
+    assert response.status_code == 200, response.text
+    workflow_id = response.json()["workflow_id"]
+    _execute(client, workflow_id, "first")
+    _execute(client, workflow_id, "second")
+    messages = client.get(
+        "/api/messages", params={"workflow_id": workflow_id, "limit": 200}
+    ).json()["messages"]
+    assert len({m["run_id"] for m in messages}) >= 2
+    assert [m["timestamp"] for m in messages] == sorted(m["timestamp"] for m in messages)
+
+
+def test_status_exposes_active_agent(client):
+    response = _create(client, _multi_model_payload())
+    workflow_id = response.json()["workflow_id"]
+    status = _execute(client, workflow_id)
+    assert "active_agent" in status

@@ -11,6 +11,9 @@ router = APIRouter()
 async def get_messages(
     workflow_id: Optional[str] = Query(None, description="过滤特定工作流的消息"),
     run_id: Optional[str] = Query(None, description="过滤某次运行的消息（历史回看不调用模型）"),
+    limit: int = Query(50, ge=1, le=200),
+    before: Optional[float] = Query(None, description="只返回该时间戳之前的消息"),
+    include_internal: bool = Query(False, description="是否返回 Lead 规划等内部消息"),
 ):
     """获取消息历史（只读内存；历史回看不触发模型调用）"""
     from agentflow.api.routes.workflow import workflows
@@ -47,31 +50,35 @@ async def get_messages(
         raise HTTPException(status_code=404, detail="Run messages not found")
 
     if workflow_id:
-        # 获取特定工作流的消息（当前/最近一次运行；重启后从 DB 回放）
-        if workflow_id not in workflows:
-            if MessageRepository is not None and get_db is not None:
-                with get_db() as db:
-                    rows = MessageRepository.list_by_workflow(db, workflow_id)
-                if rows:
-                    return {
-                        "workflow_id": workflow_id,
-                        "run_id": rows[-1].get("run_id"),
-                        "messages": rows,
-                        "count": len(rows),
-                    }
+        rows = []
+        if MessageRepository is not None and get_db is not None:
+            with get_db() as db:
+                rows = MessageRepository.list_by_workflow(db, workflow_id)
+
+        if workflow_id in workflows:
+            executor = workflows[workflow_id]
+            rows = rows + [msg.to_dict() for msg in executor.message_history]
+        elif not rows:
             raise HTTPException(status_code=404, detail="Workflow not found")
 
-        executor = workflows[workflow_id]
-        messages = [msg.to_dict() for msg in executor.message_history]
-        if not messages and MessageRepository is not None and get_db is not None:
-            with get_db() as db:
-                messages = MessageRepository.list_by_workflow(db, workflow_id)
+        deduped = {}
+        for item in rows:
+            metadata = item.get("metadata") or {}
+            item.setdefault("run_id", metadata.get("run_id"))
+            if not include_internal and metadata.get("visibility") == "internal":
+                continue
+            if before is not None and float(item.get("timestamp") or 0) >= before:
+                continue
+            deduped[str(item.get("id"))] = item
 
+        messages = sorted(deduped.values(), key=lambda item: float(item.get("timestamp") or 0))
+        messages = messages[-limit:]
+        executor = workflows.get(workflow_id)
         return {
             "workflow_id": workflow_id,
-            "run_id": executor.current_run.run_id if executor.current_run else (
+            "run_id": (executor.current_run.run_id if executor and executor.current_run else (
                 messages[-1].get("run_id") if messages else None
-            ),
+            )),
             "messages": messages,
             "count": len(messages),
         }

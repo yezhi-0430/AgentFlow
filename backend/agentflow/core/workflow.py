@@ -327,6 +327,8 @@ class WorkflowExecutor:
 
         # 执行策略（环境变量，默认保持旧行为：不超时、不重试）
         self.step_timeout_seconds = _env_float("AGENTFLOW_STEP_TIMEOUT_SECONDS", 0.0)
+        self.active_agent: Optional[str] = None
+        self.active_model: Optional[str] = None
         self.max_attempts = _env_int("AGENTFLOW_MAX_ATTEMPTS", 1, minimum=1, maximum=5)
         self.record_text_limit = _env_int("AGENTFLOW_RECORD_TEXT_LIMIT", 20000)
         self.max_runs = _env_int("AGENTFLOW_MAX_RUNS", 1000)
@@ -1044,6 +1046,7 @@ class WorkflowExecutor:
         receiver: Optional[str] = None,
         response_receiver: Optional[str] = None,
         message_content: Optional[str] = None,
+        visibility: str = "chat",
     ) -> Dict[str, Any]:
         """执行单个步骤并写记录；供层次/辩论/投票/动态模式复用。
 
@@ -1057,6 +1060,8 @@ class WorkflowExecutor:
             }
 
         self.current_step = index + 1
+        agent_role = getattr(agent, "role", None) or getattr(agent.config, "role", None)
+        agent_role = getattr(agent_role, "value", str(agent_role))
         step_result = StepResult(
             step_id=step.id,
             agent_name=step.agent_name,
@@ -1065,7 +1070,14 @@ class WorkflowExecutor:
             input_text=self._record_text(input_text),
             started_at=time.time(),
         )
-        metadata = {"step_id": step.id, "step_index": index, "run_id": run.run_id}
+        metadata = {
+            "step_id": step.id,
+            "step_index": index,
+            "run_id": run.run_id,
+            "model": agent.config.model,
+            "role": agent_role,
+            "visibility": visibility,
+        }
         if message_content is not None:
             # 完整 prompt 仍交给模型；短文案只用于聊天时间线展示
             metadata["display_content"] = message_content
@@ -1093,6 +1105,8 @@ class WorkflowExecutor:
         step_start = time.time()
 
         try:
+            self.active_agent = agent.name
+            self.active_model = agent.config.model
             outcome = await self._process_with_policy(agent, message, run)
         except asyncio.CancelledError:
             step_result.status = RunStatus.CANCELLED
@@ -1103,6 +1117,9 @@ class WorkflowExecutor:
             run.add_step_result(step_result)
             await self._persist_run(run)
             raise
+        finally:
+            self.active_agent = None
+            self.active_model = None
 
         step_result.attempts = outcome["attempts"]
         step_result.error_type = outcome["error_type"]
@@ -1116,6 +1133,12 @@ class WorkflowExecutor:
             if response_receiver:
                 response.sender = step.agent_name
                 response.receiver = response_receiver
+            response.metadata = {
+                **(response.metadata or {}),
+                "model": agent.config.model,
+                "role": agent_role,
+                "visibility": visibility,
+            }
             step_result.output_message_id = response.id
             step_result.output_text = self._record_text(response.content)
             model, finish_reason = self._extract_response_meta(response)
@@ -1570,6 +1593,7 @@ class WorkflowExecutor:
             agent=agent, input_text=tool_prompt, run=run, trace=trace, index=index,
             sender=caller_name, receiver=target, response_receiver=caller_name,
             message_content=f"[工具] {caller_name} → {target}: {directive['task']}",
+            visibility="tool",
         )
         index += 1
         tool_calls += 1
@@ -1588,6 +1612,7 @@ class WorkflowExecutor:
                 agent=self.agents[caller_name], input_text=follow_prompt, run=run, trace=trace, index=index,
                 sender=target, receiver=caller_name, response_receiver="group",
                 message_content="基于工具结果给出最终回答",
+                visibility="tool",
             )
             index += 1
             if not follow["ok"]:
@@ -1638,6 +1663,7 @@ class WorkflowExecutor:
                 run=run, trace=trace, index=index + 100 + state["calls"],
                 sender=caller_name, receiver=target, response_receiver=caller_name,
                 message_content=f"[工具] {caller_name} → {target}: {tool_task}",
+                visibility="tool",
             )
             if not outcome["ok"]:
                 state["failed"] = True
@@ -1706,6 +1732,7 @@ class WorkflowExecutor:
                     agent=lead, input_text=plan_input, run=run, trace=trace, index=index,
                     sender="group", receiver=lead_name, response_receiver="group",
                     message_content="[系统] 请 Lead 决定下一位发言者与子任务",
+                    visibility="internal",
                 )
                 index += 1
                 if not plan["ok"]:
@@ -1803,6 +1830,7 @@ class WorkflowExecutor:
                     agent=lead, input_text=summary_input, run=run, trace=trace, index=index,
                     sender="group", receiver=lead_name, response_receiver="group",
                     message_content="请总结以上群聊并给出最终交付",
+                    visibility="system",
                 )
                 if not final["ok"]:
                     if not final["cancelled"]:
@@ -1976,6 +2004,8 @@ class WorkflowExecutor:
             "workflow_id": self.workflow_id,
             "status": self.status,
             "current_step": self.current_step,
+            "active_agent": self.active_agent,
+            "active_model": self.active_model,
             "total_steps": len(self.config.steps),
             "pattern": self.config.pattern.value,
             "messages": len(self.message_history),
