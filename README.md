@@ -9,12 +9,12 @@ AgentFlow 帮助开发者将多个 AI Agent 组织成工作流，让它们按步
 ## 最新版本亮点（2026-10-25）
 
 - **七种协作模式**：顺序、并行、层次、辩论、投票、动态、群聊；创建时按模式自动分配协调者/工作者/辩手/裁判角色，并校验最低智能体数量。
-- **独立群聊导航与工具协作**：群聊列表 + 聊天视图，支持可选 Lead、轮询发言、`@点名`、结构化 handoff；工具层同时支持执行器中介 `ask_agent`/`handoff_to` 与 **OpenAI 兼容原生 function calling（tool_calls）**，工具预算默认 **10 次/轮、30 次/run**（可配置，硬上限 20/60）；群聊消息 SQLite 持久化、重启回放；真实模型 2 Agent、单工具、多工具、原生工具与 1s 超时冒烟均通过。
+- **独立群聊导航与工具协作**：群聊列表 + 全屏微信式聊天页；创建时可为每个成员选择不同 OpenRouter 模型，并单独选择 Lead 模型；支持可选 Lead、轮询发言、`@点名`、结构化 handoff；工具层同时支持执行器中介 `ask_agent`/`handoff_to` 与 **OpenAI 兼容原生 function calling（tool_calls）**，工具预算默认 **10 次/轮、30 次/run**（可配置，硬上限 20/60）；群聊消息 SQLite 持久化、重启回放、跨 run 历史与模型徽章；真实模型 2 Agent、单工具、多工具、原生工具与 1s 超时冒烟均通过。
 - **运行记录与执行控制**：每次执行独立 run_id，记录步骤输入输出、模型、token、尝试次数、错误类型、trace_id；支持停止、单步超时与有限重试。
 - **工作流定义持久化**：本地 SQLite 保存定义（不含密钥），重启恢复，支持导出/导入。
 - **可选 Langfuse 追踪与评分**：默认关闭；开启后可在 Langfuse 查看调用树、用量与评分，本地记录里保留 trace_id。
 - **Harness²-lite 实验对比**：配置指纹、脱敏执行证据、独立 judge、候选对比报告与前端实验面板；不自动修改工作流。
-- **质量状态**：后端 219 个测试、前端 127 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
+- **质量状态**：后端 231 个测试、前端 131 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
 
 创建七种协作模式：
 
@@ -89,7 +89,7 @@ AgentFlow 将这些工作拆成可检查的组成部分：用 Agent 配置表达
 | 辩论模式 | 多辩手两轮讨论（第二轮互看观点）→ 裁判综合 | 3 |
 | 投票模式 | 多候选独立作答 → 裁判比较裁决 | 3 |
 | 动态协作 | 协调者逐轮选择工作者，最多 max_iterations 轮 → 汇总 | 2 |
-| 群聊协作 | 共享群聊记录；可选 Lead 分派/收尾，或成员轮询 + `@点名` / 结构化 handoff；支持 `ask_agent` / 原生 function calling，工具预算默认 10 次/轮、30 次/run（可配） | 2（最多 6） |
+| 群聊协作 | 共享群聊记录；创建时可选择每个成员的 OpenRouter 模型和独立 Lead 模型；全屏微信式聊天页；可选 Lead、轮询 + `@点名` / 结构化 handoff；支持 `ask_agent` / 原生 function calling，工具预算默认 10 次/轮、30 次/run（可配） | 2（最多 6） |
 
 网页创建时会按模式自动分配 coordinator / worker / reviewer 角色；群聊模式可选 Lead 或纯成员群聊。更低层的执行语义、停止/重试/记录边界见 [开发指南](docs/development.md) 与 [当前限制](docs/limitations.md)。
 
@@ -160,7 +160,7 @@ flowchart TD
 
 - 智能体画布：拖动、缩放、自动布局、详情检查与专注模式。
 - 工作流创建与执行：任务输入、状态同步、步骤进度、模型错误提示；支持顺序、并行、层次、辩论、投票、动态、群聊七种协作模式。
-- 独立群聊导航：左侧「群聊」入口，群聊列表 + 聊天视图，可选 Lead、轮询发言、@点名、结构化 handoff、停止与历史消息回看。
+- 独立群聊导航：左侧「群聊」入口进入全屏群聊页；群聊列表 + 微信式消息气泡、头像、模型徽章、成员面板、可选 Lead、轮询发言、@点名、结构化 handoff、停止与跨 run 历史回看。
 - 工作流定义持久化：重启后端后定义自动恢复；密钥不落库，恢复的工作流需要重新输入 API Key 才能执行。
 - 定义导入/导出：可导出工作流定义为版本化 JSON，或导入定义生成新工作流（导入后同样需要提供密钥）。
 - 运行历史：每次执行独立 run_id，可查看状态、步骤输入输出、模型、token、尝试次数、错误类型与 trace_id；支持按状态筛选与导出 JSON；刷新页面后从本地记录重新读取。
@@ -349,6 +349,7 @@ docs/                 开发、限制、基线与整理说明
 - [实验报告](docs/EXPERIMENTS_REPORT.md)
 - [Harness²-lite 实施报告](docs/HARNESS2_LITE_REPORT.md)
 - [群聊真实模型冒烟](docs/GROUP_CHAT_SMOKE.md)
+- [群聊多模型与全屏页冒烟](docs/GROUP_CHAT_MULTIMODEL_SMOKE.md)
 - [Harness²-lite 设计/决策清单](docs/HARNESS2_LITE_PLAN.md)
 - [Harness²-lite 假模型对比](docs/HARNESS2_COMPARISON.md)
 - [Harness²-lite 真实模型对比（一次受控）](docs/HARNESS2_REAL_COMPARISON.md)

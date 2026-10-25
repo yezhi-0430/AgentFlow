@@ -1,8 +1,10 @@
 <template>
   <GroupChatPage
     v-if="groupChatOpen"
+    :workflow-id="groupChatWorkflowId"
     @close="closeGroupChat"
     @create="onGroupCreate"
+    @select="onGroupSelect"
   />
   <div v-else class="app-shell" :class="{ 'is-focused': focusMode, 'is-resizing-timeline': timelineResizing }">
     <nav class="navigation-rail" aria-label="工作台导航">
@@ -148,20 +150,28 @@ const toast = ref(null)
 const confirm = ref(null)
 const historyPanel = ref(null)
 const groupChatOpen = ref(window.location.hash.startsWith('#group-chat'))
+const groupChatWorkflowId = ref(window.location.hash.split('/')[1] || '')
 const { height: timelineHeight, minHeight: timelineMinHeight, maxHeight: timelineMaxHeight, resizing: timelineResizing, beginResize: beginTimelineResize, moveResize: moveTimelineResize, endResize: endTimelineResize, onResizeKey: onTimelineResizeKey, resetHeight: resetTimelineHeight, fitViewport: fitTimelineViewport } = useTimelineResize()
 const patternName = computed(() => workflowPatternLabels[workflowStore.currentWorkflow?.pattern] || '未设置模式')
 
-function openGroupChat() {
+function groupChatHash(workflowId = '') {
+  return workflowId ? `#group-chat/${workflowId}` : '#group-chat'
+}
+function openGroupChat(workflowId = '') {
   groupChatOpen.value = true
-  if (!window.location.hash.startsWith('#group-chat')) {
-    window.history.pushState({ groupChat: true }, '', '#group-chat')
-  }
+  groupChatWorkflowId.value = workflowId
+  window.history.pushState({ groupChat: true }, '', groupChatHash(workflowId))
 }
 function closeGroupChat() {
   groupChatOpen.value = false
+  groupChatWorkflowId.value = ''
   if (window.location.hash.startsWith('#group-chat')) {
     window.history.pushState({}, '', `${window.location.pathname}${window.location.search}`)
   }
+}
+function onGroupSelect(workflowId) {
+  groupChatWorkflowId.value = workflowId
+  window.history.replaceState({ groupChat: true }, '', groupChatHash(workflowId))
 }
 function onGroupCreate() {
   closeGroupChat()
@@ -169,6 +179,7 @@ function onGroupCreate() {
 }
 function syncGroupChatFromHash() {
   groupChatOpen.value = window.location.hash.startsWith('#group-chat')
+  groupChatWorkflowId.value = groupChatOpen.value ? (window.location.hash.split('/')[1] || '') : ''
 }
 
 function handleShortcut(event) {
@@ -234,11 +245,12 @@ function configureConnection(task) {
     llmProvider: workflowStore.executionError.includes('OpenRouter') ? 'openrouter' : workflow?.llm_provider || 'openai',
   })
 }
-function onCreated() {
+function onCreated(workflow) {
   messageStore.clearMessages()
   inspectorOpen.value = false
   workflowStore.refreshExecution()
   workflowStore.loadWorkflows()
+  if (workflow?.pattern === 'group_chat') openGroupChat(workflow.workflow_id)
   toast.value?.success('确认下方任务后，点击「开始运行」。', '创建成功')
 }
 function onImported(workflow) {

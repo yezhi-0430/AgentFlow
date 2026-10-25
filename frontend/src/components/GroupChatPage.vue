@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { useWorkflowStore } from '../stores/workflow'
 import { messageService, workflowService } from '../services/workflow'
@@ -128,7 +128,7 @@ import { isGroupChatTerminal, normalizeGroupChatMessages } from '../utils/groupC
 import { avatarFor } from '../utils/avatars'
 
 const props = defineProps({ workflowId: { type: String, default: '' } })
-defineEmits(['close', 'create'])
+const emit = defineEmits(['close', 'create', 'select'])
 
 const workflowStore = useWorkflowStore()
 const selectedId = ref(props.workflowId || '')
@@ -247,6 +247,7 @@ function startPoll() {
 
 async function selectWorkflow(workflowId) {
   selectedId.value = workflowId
+  emit('select', workflowId)
   error.value = ''
   rawMessages.value = []
   clearPoll()
@@ -285,6 +286,10 @@ async function stop() {
     error.value = '停止失败，请稍后重试'
   }
 }
+
+watch(() => props.workflowId, workflowId => {
+  if (workflowId && workflowId !== selectedId.value) selectWorkflow(workflowId)
+})
 
 onMounted(async () => {
   await workflowStore.loadWorkflows()
