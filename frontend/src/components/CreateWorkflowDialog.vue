@@ -111,8 +111,8 @@ const props = defineProps({ modelValue: Boolean, preset: { type: Object, default
 const emit = defineEmits(['update:modelValue', 'created'])
 const workflowStore = useWorkflowStore()
 const defaults = () => {
-  const provider = pattern === 'group_chat' ? 'openrouter' : (props.preset?.llmProvider || 'openai')
   const pattern = normalizeCreationPattern(props.preset?.pattern)
+  const provider = pattern === 'group_chat' ? 'openrouter' : (props.preset?.llmProvider || 'openai')
   return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '', groupMemberModels: [], leadModel: '' }
 }
 const form = ref(defaults())
