@@ -26,7 +26,7 @@ Harness²-lite 实验对比面板：
 
 独立群聊导航：
 
-![群聊协作面板](docs/images/group-chat-panel.png)
+![多模型群聊全屏页](docs/images/group-chat-multimodel.png)
 
 
 ## 项目解决什么问题？
