@@ -189,6 +189,36 @@ async def test_group_chat_tool_ask_agent_returns_result_to_caller():
 
 
 @pytest.mark.asyncio
+async def test_group_chat_tool_invalid_target_marks_partial():
+    first = ScriptedAgent("member_1", AgentRole.WORKER, [
+        '{"tool": "ask_agent", "agent": "ghost", "task": "核对事实"}'
+    ])
+    second = ScriptedAgent("member_2", AgentRole.WORKER, ["不应被调用"])
+    executor = build_executor([first, second], max_iterations=2)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "partial"
+    run = executor.get_run(result["run_id"])
+    assert not any(step.step_id.startswith("tool_") for step in run.step_results)
+    assert second.calls == []
+
+
+@pytest.mark.asyncio
+async def test_group_chat_tool_missing_arguments_marks_partial():
+    first = ScriptedAgent("member_1", AgentRole.WORKER, [
+        '{"tool": "ask_agent", "agent": "member_2"}'
+    ])
+    second = ScriptedAgent("member_2", AgentRole.WORKER, ["不应被调用"])
+    executor = build_executor([first, second], max_iterations=2)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "partial"
+    assert second.calls == []
+
+
+@pytest.mark.asyncio
 async def test_group_chat_requires_at_least_two_agents():
     only = ScriptedAgent("member_1", AgentRole.WORKER, ["x"])
     executor = build_executor([only])

@@ -1468,17 +1468,21 @@ class WorkflowExecutor:
 
     # -------------------------------------------------------------- group chat
     def _parse_group_tool(self, content: str) -> Optional[Dict[str, str]]:
-        """解析执行器中介的工具调用：ask_agent / handoff_to。"""
+        """解析执行器中介的工具调用：ask_agent / handoff_to。
+
+        返回 None 表示不是工具指令；返回带 invalid 的字典表示工具指令格式/目标非法，
+        调用方应标记 partial，而不是把这段 JSON 当普通回答继续。
+        """
         payload = self._parse_dynamic_plan(content)
-        if not payload:
+        if not payload or "tool" not in payload:
             return None
         tool = str(payload.get("tool") or "").strip().lower()
         if tool not in ("ask_agent", "handoff_to"):
-            return None
+            return {"tool": tool, "invalid": "unknown_tool"}
         target = str(payload.get("agent") or payload.get("target") or "").strip()
         task = str(payload.get("task") or payload.get("question") or "").strip()
         if not target or not task:
-            return None
+            return {"tool": tool, "invalid": "missing_agent_or_task"}
         return {"tool": tool, "agent": target, "task": task}
 
     async def _execute_group_tool(
@@ -1498,6 +1502,8 @@ class WorkflowExecutor:
         directive = self._parse_group_tool(content)
         if not directive:
             return False, index, tool_calls, True
+        if directive.get("invalid"):
+            return True, index, tool_calls, False
         if tool_calls >= MAX_GROUP_TOOL_CALLS:
             return True, index, tool_calls, False
         target = directive["agent"]
