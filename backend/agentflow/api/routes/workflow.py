@@ -207,7 +207,7 @@ def _group_chat_specs(
     if not isinstance(group_chat, dict) or "members" not in group_chat:
         return None, []
 
-    if config.get("llm_provider", "openai").lower() != "openrouter":
+    if str(config.get("llm_provider", "openai")).lower() != "openrouter":
         raise HTTPException(status_code=400, detail="group_chat requires OpenRouter when members are configured")
 
     raw_members = group_chat.get("members")
@@ -232,8 +232,8 @@ def _group_chat_specs(
         member_model = str(item.get("model") or "").strip()
         if not name or not member_model:
             raise HTTPException(status_code=400, detail=f"group_chat.members[{index}] requires name and model")
-        if name == "lead":
-            raise HTTPException(status_code=400, detail="group_chat member name 'lead' is reserved")
+        if name.casefold() in {"lead", "system", "group", "human"}:
+            raise HTTPException(status_code=400, detail=f"group_chat member name is reserved: {name}")
         if name in seen:
             raise HTTPException(status_code=400, detail=f"duplicate group_chat member name: {name}")
         seen.add(name)

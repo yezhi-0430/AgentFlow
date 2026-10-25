@@ -14,7 +14,7 @@ AgentFlow 帮助开发者将多个 AI Agent 组织成工作流，让它们按步
 - **工作流定义持久化**：本地 SQLite 保存定义（不含密钥），重启恢复，支持导出/导入。
 - **可选 Langfuse 追踪与评分**：默认关闭；开启后可在 Langfuse 查看调用树、用量与评分，本地记录里保留 trace_id。
 - **Harness²-lite 实验对比**：配置指纹、脱敏执行证据、独立 judge、候选对比报告与前端实验面板；不自动修改工作流。
-- **质量状态**：后端 231 个测试、前端 132 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
+- **质量状态**：后端 237 个测试、前端 134 个测试；GitHub Actions 的 backend/frontend 两个 job 均通过。
 
 创建七种协作模式：
 
@@ -295,7 +295,7 @@ python scripts/dev.py --backend-port 8002 --frontend-port 5176
 | 评测 | 10 个固定 case + 确定性评分 + 一次受控真实模型实验（30 次执行，样本有限，不外推质量结论） |
 | Harness²-lite | 配置指纹、脱敏证据（默认关闭/90 天）、独立 judge（≤50 次/轮）、候选对比报告与前端实验面板；真实实验一次受控运行 |
 | 追踪关联 | Langfuse 可选；run 记录/实验 case 带 trace_id，未启用时为 null |
-| 测试与 CI | 后端 231、前端 132 个测试；GitHub Actions backend/frontend 两个 job 通过 |
+| 测试与 CI | 后端 237、前端 134 个测试；GitHub Actions backend/frontend 两个 job 通过 |
 | 本地访问控制 | 可选 `AGENTFLOW_API_TOKEN`（Bearer）；默认关闭，不替代生产鉴权 |
 | 团队或公网部署 | 尚无完整鉴权、多用户隔离，需要进一步开发 |
 
@@ -327,7 +327,7 @@ python scripts/run_experiment.py --config all
 python scripts/run_baseline.py   # 重新生成 docs/BASELINE_REPORT.md
 ```
 
-前端测试使用 Node 自带测试运行器；后端测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查（backend：pytest + 假模型实验冒烟 + wheel + check_repo；frontend：lint + test + build）。当前后端 231、前端 132 个测试，数字与最近一次基线见 [基线报告](docs/BASELINE_REPORT.md)。
+前端测试使用 Node 自带测试运行器；后端测试使用模拟模型，不消耗 API 额度。GitHub Actions 会运行同样的基础检查（backend：pytest + 假模型实验冒烟 + wheel + check_repo；frontend：lint + test + build）。当前后端 237、前端 134 个测试，数字与最近一次基线见 [基线报告](docs/BASELINE_REPORT.md)。
 
 ## 项目结构
 

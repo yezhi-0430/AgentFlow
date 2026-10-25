@@ -98,7 +98,7 @@ npm run dev -- --host 127.0.0.1 --strictPort
 - 群聊成员还支持 **OpenAI 兼容原生 function calling**：适配器返回 `tool_calls` 后，`LLMAgent` 在内部执行工具循环（默认最多 10 轮，`AGENTFLOW_GROUP_MAX_TOOL_ROUNDS`，硬上限 20），执行器把目标 Agent 的结果作为 `tool` 消息回传，再让调用者生成最终回答。原生工具不可用时仍可用上面的 JSON 协议。
 - 群聊消息写入 `workflow_messages` 表（写入前脱敏），按 workflow/run 回放；`GET /api/messages` 默认返回跨 run 可见历史，隐藏 `visibility=internal` 的 Lead 规划消息，并支持 `before`/`limit` 分页。
 - 群聊消息的 `content` 保存完整 prompt（模型实际看到的上下文），时间线用 `metadata.display_content` 显示短文案，避免把整段 transcript 刷进聊天气泡。
-- 真实模型冒烟见 [GROUP_CHAT_SMOKE.md](GROUP_CHAT_SMOKE.md)。
+- 真实模型冒烟见 [GROUP_CHAT_MULTIMODEL_SMOKE.md](GROUP_CHAT_MULTIMODEL_SMOKE.md)。
 - 实验脚本的固定配置仍只使用 sequential/parallel，尚未把这些新模式纳入评测数据集。
 
 ### Harness²-lite（实验对比）

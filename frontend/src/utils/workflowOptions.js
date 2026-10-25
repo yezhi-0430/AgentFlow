@@ -97,9 +97,12 @@ export const modelOptions = {
   ],
   deepseek: [{ value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash', description: 'deepseek-v4-flash', tag: '默认' }],
   openrouter: [
-    { value: 'openai/gpt-6.1-sol', label: 'GPT-6.1-SOL', description: 'openai/gpt-6.1-sol', tag: '默认' },
-    { value: 'deepseek/deepseek-v4-flash', label: 'DeepSeek V4 Flash', description: 'deepseek/deepseek-v4-flash' },
-    { value: 'anthropic/claude-3-5-haiku', label: 'Claude 3.5 Haiku', description: 'anthropic/claude-3-5-haiku' },
-    { value: 'anthropic/claude-opus-5-5', label: 'Claude Opus 5.5', description: 'anthropic/claude-opus-5-5' },
+    { value: 'openai/gpt-4o', label: 'GPT-4o', description: 'openai/gpt-4o', tag: '默认' },
+    { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', description: 'anthropic/claude-3.5-sonnet' },
+    { value: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash', description: 'google/gemini-2.0-flash-001' },
+    { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat', description: 'deepseek/deepseek-chat' },
+    { value: 'qwen/qwen-2.5-72b-instruct', label: 'Qwen 2.5 72B', description: 'qwen/qwen-2.5-72b-instruct' },
+    { value: 'x-ai/grok-2-1212', label: 'Grok 2', description: 'x-ai/grok-2-1212' },
+    { value: 'mistralai/mistral-large', label: 'Mistral Large', description: 'mistralai/mistral-large' },
   ],
 }

@@ -39,16 +39,19 @@
                   <label class="group-chat-lead"><input v-model="form.enableLead" type="checkbox" :disabled="creating" /> 启用 Lead Agent</label>
                   <p class="hint">开启后由 Lead 规划、分派并总结；关闭后成员轮流发言，可用 @成员名 点名。</p>
                   <div class="group-model-grid">
-                    <div v-for="(member, index) in form.groupMemberModels" :key="member.name" class="form-group group-model-row">
-                      <label :for="`group-model-${index}`">{{ member.name }} 模型</label>
+                    <div v-for="(member, index) in form.groupMemberModels" :key="index" class="form-group group-model-row">
+                      <label :for="`group-model-${index}`">成员 {{ index + 1 }}</label>
+                      <input v-model="member.name" type="text" class="group-member-name" :disabled="creating" aria-label="成员名称" />
                       <AppSelect :id="`group-model-${index}`" v-model="member.model" label="成员模型" :options="groupModelOptions" :disabled="creating" />
+                      <input v-model="member.customModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 model id（可选）" aria-label="自定义成员模型" />
                     </div>
                     <div v-if="form.enableLead" class="form-group group-model-row">
                       <label for="group-lead-model">Lead 模型</label>
                       <AppSelect id="group-lead-model" v-model="form.leadModel" label="Lead 模型" :options="groupModelOptions" :disabled="creating" />
+                      <input v-model="form.leadCustomModel" type="text" class="group-member-name" :disabled="creating" placeholder="自定义 Lead model id（可选）" aria-label="自定义 Lead 模型" />
                     </div>
                   </div>
-                  <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型。</p>
+                  <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型，也可填写自定义 model id。</p>
                 </div>
               </section>
 
@@ -113,7 +116,7 @@ const workflowStore = useWorkflowStore()
 const defaults = () => {
   const pattern = normalizeCreationPattern(props.preset?.pattern)
   const provider = pattern === 'group_chat' ? 'openrouter' : (props.preset?.llmProvider || 'openai')
-  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '', groupMemberModels: [], leadModel: '' }
+  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '', groupMemberModels: [], leadModel: '', leadCustomModel: '' }
 }
 const form = ref(defaults())
 const creating = ref(false)
@@ -150,8 +153,8 @@ const connectionError = computed(() => validateConnection(form.value.llmProvider
 const groupModelsValid = computed(() => {
   if (form.value.pattern !== 'group_chat') return true
   const members = form.value.groupMemberModels || []
-  if (!members.length || members.some(member => !member.model)) return false
-  return form.value.enableLead ? Boolean(form.value.leadModel) : true
+  if (!members.length || members.some(member => !(member.customModel || member.model) || !member.name)) return false
+  return form.value.enableLead ? Boolean(form.value.leadCustomModel || form.value.leadModel) : true
 })
 const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && (form.value.pattern === 'group_chat' ? groupModelsValid.value : selectedModel.value) && !connectionError.value))
 
@@ -160,12 +163,18 @@ function syncGroupModels() {
   const count = Math.max(1, form.value.enableLead ? form.value.agentCount - 1 : form.value.agentCount)
   const options = groupModelOptions.value
   const fallback = options[0]?.value || 'openai/gpt-4o'
+  const valid = new Set(options.map(option => option.value))
   const current = [...(form.value.groupMemberModels || [])]
-  form.value.groupMemberModels = Array.from({ length: count }, (_, index) => ({
-    name: `member_${index + 1}`,
-    model: current[index]?.model || fallback,
-  }))
-  if (!form.value.leadModel) form.value.leadModel = fallback
+  form.value.groupMemberModels = Array.from({ length: count }, (_, index) => {
+    const candidate = current[index]?.model
+    return {
+      name: current[index]?.name || `member_${index + 1}`,
+      model: valid.has(candidate) ? candidate : fallback,
+      customModel: current[index]?.customModel || '',
+    }
+  })
+  if (!valid.has(form.value.leadModel)) form.value.leadModel = fallback
+  if (form.value.leadCustomModel == null) form.value.leadCustomModel = ''
 }
 
 async function loadModelCatalog() {
@@ -235,8 +244,11 @@ async function create() {
         group_chat: form.value.pattern === 'group_chat'
           ? buildGroupChatConfig({
               enableLead: form.value.enableLead,
-              leadModel: form.value.leadModel,
-              members: form.value.groupMemberModels,
+              leadModel: form.value.leadCustomModel || form.value.leadModel,
+              members: form.value.groupMemberModels.map(member => ({
+                name: member.name,
+                model: member.customModel || member.model,
+              })),
             })
           : undefined,
       },
@@ -258,5 +270,6 @@ onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.sty
 <style scoped>
 .group-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
 .group-model-row { margin: 0; }
+.group-member-name { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 7px 8px; border: 1px solid #d9e2e1; border-radius: 7px; font: inherit; }
 @media (max-width: 720px) { .group-model-grid { grid-template-columns: 1fr; } }
 </style>

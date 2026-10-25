@@ -566,15 +566,19 @@ class MessageRepository:
 
     @staticmethod
     def list_by_workflow(
-        db: Session, workflow_id: str, limit: int = 500
+        db: Session,
+        workflow_id: str,
+        limit: Optional[int] = None,
+        before: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        rows = (
-            db.query(WorkflowMessageModel)
-            .filter_by(workflow_id=workflow_id)
-            .order_by(asc(WorkflowMessageModel.timestamp))
-            .limit(max(1, min(limit, 2000)))
-            .all()
-        )
+        query = db.query(WorkflowMessageModel).filter_by(workflow_id=workflow_id)
+        if before is not None:
+            query = query.filter(WorkflowMessageModel.timestamp < before)
+        query = query.order_by(desc(WorkflowMessageModel.timestamp))
+        if limit is not None:
+            query = query.limit(max(1, min(limit, 5000)))
+        rows = query.all()
+        rows.reverse()
         return [MessageRepository._to_dict(row) for row in rows]
 
     @staticmethod

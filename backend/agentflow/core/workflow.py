@@ -1047,6 +1047,7 @@ class WorkflowExecutor:
         response_receiver: Optional[str] = None,
         message_content: Optional[str] = None,
         visibility: str = "chat",
+        input_visibility: Optional[str] = None,
     ) -> Dict[str, Any]:
         """执行单个步骤并写记录；供层次/辩论/投票/动态模式复用。
 
@@ -1062,6 +1063,9 @@ class WorkflowExecutor:
         self.current_step = index + 1
         agent_role = getattr(agent, "role", None) or getattr(agent.config, "role", None)
         agent_role = getattr(agent_role, "value", str(agent_role))
+        sender_agent = self.agents.get(sender)
+        sender_role = getattr(sender_agent, "role", None) if sender_agent else None
+        sender_role = getattr(sender_role, "value", str(sender_role)) if sender_agent else agent_role
         step_result = StepResult(
             step_id=step.id,
             agent_name=step.agent_name,
@@ -1074,9 +1078,9 @@ class WorkflowExecutor:
             "step_id": step.id,
             "step_index": index,
             "run_id": run.run_id,
-            "model": agent.config.model,
-            "role": agent_role,
-            "visibility": visibility,
+            "model": sender_agent.config.model if sender_agent else agent.config.model,
+            "role": sender_role,
+            "visibility": input_visibility or visibility,
         }
         if message_content is not None:
             # 完整 prompt 仍交给模型；短文案只用于聊天时间线展示
@@ -1138,6 +1142,7 @@ class WorkflowExecutor:
                 "model": agent.config.model,
                 "role": agent_role,
                 "visibility": visibility,
+                "run_id": run.run_id,
             }
             step_result.output_message_id = response.id
             step_result.output_text = self._record_text(response.content)
@@ -1786,6 +1791,7 @@ class WorkflowExecutor:
                         agent=member, input_text=member_input, run=run, trace=trace, index=index,
                         sender=lead_name, receiver=next_name, response_receiver="group",
                         message_content=subtask,
+                        input_visibility="system",
                     )
                 finally:
                     if hasattr(member, "tools"):
@@ -1820,6 +1826,20 @@ class WorkflowExecutor:
 
             if finished_summary is not None:
                 final_content = finished_summary
+                summary_message = Message(
+                    sender=lead_name,
+                    receiver="group",
+                    content=finished_summary,
+                    message_type=MessageType.RESPONSE,
+                    metadata={
+                        "model": lead.config.model,
+                        "role": "coordinator",
+                        "visibility": "system",
+                        "run_id": run.run_id,
+                    },
+                )
+                self.message_history.append(summary_message)
+                await self._persist_group_message(summary_message, run)
             else:
                 summary_input = (
                     f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
@@ -1882,6 +1902,7 @@ class WorkflowExecutor:
                     agent=agent, input_text=group_input, run=run, trace=trace, index=index,
                     sender="group", receiver=speaker, response_receiver="group",
                     message_content="请继续群聊，补充观点或推进任务",
+                    input_visibility="system",
                 )
             finally:
                 if hasattr(agent, "tools"):

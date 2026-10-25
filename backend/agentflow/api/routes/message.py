@@ -65,7 +65,10 @@ async def get_messages(
         for item in rows:
             metadata = item.get("metadata") or {}
             item.setdefault("run_id", metadata.get("run_id"))
-            if not include_internal and metadata.get("visibility") == "internal":
+            if not include_internal and (
+                metadata.get("visibility") == "internal"
+                or str(metadata.get("step_id") or "").startswith("lead_plan_")
+            ):
                 continue
             if before is not None and float(item.get("timestamp") or 0) >= before:
                 continue

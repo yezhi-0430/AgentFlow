@@ -61,8 +61,8 @@
                 <div class="gc-bubble-wrap">
                   <header class="gc-bubble-meta">
                     <strong>{{ item.sender }}</strong>
-                    <span v-if="item.model" class="gc-model">{{ modelLabel(item.model) }}</span>
-                    <span v-if="item.role" class="gc-role">{{ item.role }}</span>
+                    <span v-if="item.kind !== 'system' && item.model" class="gc-model">{{ modelLabel(item.model) }}</span>
+                    <span v-if="item.kind !== 'system' && item.role" class="gc-role">{{ item.role }}</span>
                     <time>{{ formatTime(item.timestamp) }}</time>
                   </header>
                   <div class="gc-bubble">
@@ -124,7 +124,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { useWorkflowStore } from '../stores/workflow'
 import { messageService, workflowService } from '../services/workflow'
-import { isGroupChatTerminal, normalizeGroupChatMessages } from '../utils/groupChat'
+import { formatChatTime, isGroupChatTerminal, normalizeGroupChatMessages } from '../utils/groupChat'
 import { avatarFor } from '../utils/avatars'
 
 const props = defineProps({ workflowId: { type: String, default: '' } })
@@ -143,12 +143,13 @@ const error = ref('')
 const scrollBox = ref(null)
 const hasEarlier = ref(false)
 let pollTimer = null
+let requestToken = 0
 
 const groupWorkflows = computed(() => (workflowStore.workflows || []).filter(workflow => workflow.pattern === 'group_chat'))
 const selected = computed(() => groupWorkflows.value.find(workflow => workflow.workflow_id === selectedId.value) || null)
 const members = computed(() => selected.value?.agents || [])
 const membersText = computed(() => members.value.length ? members.value.map(member => member.name).join('、') : '共享群聊')
-const messages = computed(() => normalizeGroupChatMessages(rawMessages.value).filter(message => message.kind))
+const messages = computed(() => rawMessages.value.filter(message => message.kind))
 const timeline = computed(() => {
   const items = []
   let lastRun = ''
@@ -179,9 +180,7 @@ function groupModelSummary(group) {
 }
 
 function formatTime(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return formatChatTime(value)
 }
 
 function clearPoll() {
@@ -191,26 +190,38 @@ function clearPoll() {
   }
 }
 
+function nearBottom() {
+  const box = scrollBox.value
+  return !box || box.scrollHeight - box.scrollTop - box.clientHeight < 120
+}
+
 async function scrollToBottom() {
   await nextTick()
   if (scrollBox.value) scrollBox.value.scrollTop = scrollBox.value.scrollHeight
 }
 
-async function loadMessages({ before } = {}) {
-  if (!selectedId.value) return
+async function loadMessages({ before, silent = false } = {}) {
+  const workflowId = selectedId.value
+  const token = requestToken
+  if (!workflowId) return
   try {
-    const data = await messageService.getMessages(selectedId.value, before ? { before, limit: 50 } : { limit: 50 })
+    const data = await messageService.getMessages(workflowId, before ? { before, limit: 50 } : { limit: 50 })
+    if (token !== requestToken || workflowId !== selectedId.value) return
     const incoming = normalizeGroupChatMessages(data?.messages || []).filter(message => message.kind)
+    const shouldScroll = !silent && nearBottom()
     if (before) {
       const known = new Set(rawMessages.value.map(message => message.id))
       rawMessages.value = [...incoming.filter(message => !known.has(message.id)), ...rawMessages.value]
-    } else {
-      rawMessages.value = incoming
       hasEarlier.value = (data?.messages || []).length >= 50
-      scrollToBottom()
+    } else {
+      const merged = new Map(rawMessages.value.map(message => [message.id, message]))
+      incoming.forEach(message => merged.set(message.id, message))
+      rawMessages.value = [...merged.values()].sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
+      if (incoming.length >= 50) hasEarlier.value = true
+      if (!silent && shouldScroll) await scrollToBottom()
     }
   } catch {
-    rawMessages.value = before ? rawMessages.value : []
+    if (token === requestToken && workflowId === selectedId.value && !before && !silent) error.value = '消息加载失败'
   }
 }
 
@@ -220,17 +231,24 @@ async function loadEarlier() {
 }
 
 async function syncStatus() {
-  if (!selectedId.value) return
+  const workflowId = selectedId.value
+  const token = requestToken
+  if (!workflowId) return
   try {
-    const data = await workflowService.getWorkflowStatus(selectedId.value)
+    const data = await workflowService.getWorkflowStatus(workflowId)
+    if (token !== requestToken || workflowId !== selectedId.value) return
     statusText.value = data.status || 'idle'
     running.value = ['executing', 'running', 'stopping', 'paused'].includes(String(statusText.value).toLowerCase())
     activeAgent.value = data.active_agent || ''
     activeModel.value = data.active_model || ''
+    if (data.status === 'failed') error.value = String(data.current_run?.error || '群聊执行失败')
     if (isGroupChatTerminal(statusText.value)) {
+      await loadMessages({ silent: true })
       activeAgent.value = ''
       activeModel.value = ''
       clearPoll()
+    } else if (running.value) {
+      startPoll()
     }
   } catch {
     // 状态读取失败时保留当前页面，下一次轮询继续。
@@ -238,22 +256,30 @@ async function syncStatus() {
 }
 
 function startPoll() {
-  clearPoll()
+  if (pollTimer) return
   pollTimer = setInterval(async () => {
-    await loadMessages()
+    await loadMessages({ silent: true })
     await syncStatus()
   }, 1200)
 }
 
 async function selectWorkflow(workflowId) {
+  requestToken += 1
   selectedId.value = workflowId
   emit('select', workflowId)
   error.value = ''
   rawMessages.value = []
+  hasEarlier.value = false
+  running.value = false
+  statusText.value = 'idle'
+  activeAgent.value = ''
+  activeModel.value = ''
+  task.value = ''
+  apiKey.value = ''
   clearPoll()
   await loadMessages()
   await syncStatus()
-  startPoll()
+  if (running.value) startPoll()
 }
 
 async function run() {
@@ -295,10 +321,11 @@ onMounted(async () => {
   await workflowStore.loadWorkflows()
   if (!selectedId.value) selectedId.value = groupWorkflows.value[0]?.workflow_id || ''
   if (selectedId.value) {
+    requestToken += 1
     emit('select', selectedId.value)
     await loadMessages()
     await syncStatus()
-    startPoll()
+    if (running.value) startPoll()
   }
 })
 
