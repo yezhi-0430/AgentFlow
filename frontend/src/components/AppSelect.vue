@@ -23,13 +23,16 @@
             @click.stop
             @keydown.stop
           />
-          <div v-for="(option, index) in filteredOptions" :id="optionId(index)" :key="option.value" role="option"
-            class="select-option" :class="{ 'is-active': active === index, 'is-selected': option.value === modelValue }"
-            :aria-selected="option.value === modelValue" @pointermove="active = index" @pointerdown.prevent @click="choose(index)">
-            <span v-if="option.symbol" class="select-symbol">{{ option.symbol }}</span>
-            <span class="select-option-copy"><span class="select-option-title">{{ option.label }}<span v-if="option.tag" class="select-option-tag">{{ option.tag }}</span></span><small v-if="option.description">{{ option.description }}</small></span>
-            <AppIcon v-if="option.value === modelValue" class="select-check" name="check" :size="16" />
-          </div>
+          <template v-for="group in groupedOptions" :key="group.name">
+            <div v-if="group.name" class="select-group-title">{{ group.name }}</div>
+            <div v-for="option in group.options" :id="optionId(option._index)" :key="option.value" role="option"
+              class="select-option" :class="{ 'is-active': active === option._index, 'is-selected': option.value === modelValue }"
+              :aria-selected="option.value === modelValue" @pointermove="active = option._index" @pointerdown.prevent @click="choose(option._index)">
+              <span v-if="option.symbol" class="select-symbol">{{ option.symbol }}</span>
+              <span class="select-option-copy"><span class="select-option-title">{{ option.label }}<span v-if="option.tag" class="select-option-tag">{{ option.tag }}</span></span><small v-if="option.description">{{ option.description }}</small></span>
+              <AppIcon v-if="option.value === modelValue" class="select-check" name="check" :size="16" />
+            </div>
+          </template>
         </div>
       </Transition>
     </Teleport>
@@ -69,6 +72,15 @@ const filteredOptions = computed(() => {
     || String(option.value || '').toLowerCase().includes(query)
     || String(option.description || '').toLowerCase().includes(query)
   )
+})
+const groupedOptions = computed(() => {
+  const groups = new Map()
+  filteredOptions.value.forEach((option, index) => {
+    const name = option.group || ''
+    if (!groups.has(name)) groups.set(name, [])
+    groups.get(name).push({ ...option, _index: index })
+  })
+  return [...groups.entries()].map(([name, options]) => ({ name, options }))
 })
 let search = ''
 let searchTimer
@@ -178,4 +190,5 @@ onBeforeUnmount(() => { removeListeners(); clearTimeout(searchTimer) })
 <style scoped>
 .select-search { width: calc(100% - 20px); margin: 0 10px 8px; padding: 7px 9px; border: 1px solid #d9d9d9; border-radius: 6px; font: inherit; font-size: 12px; outline: none; }
 .select-search:focus { border-color: #191919; }
+.select-group-title { padding: 7px 12px 4px; color: #999; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
 </style>

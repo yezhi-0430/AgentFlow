@@ -18,21 +18,31 @@
     <div class="gc-body">
       <aside class="gc-sidebar" aria-label="群聊列表">
         <div class="gc-sidebar-heading">群聊</div>
-        <button
-          v-for="group in groupWorkflows"
-          :key="group.workflow_id"
-          type="button"
-          class="gc-group"
-          :class="{ selected: group.workflow_id === selectedId }"
-          @click="selectWorkflow(group.workflow_id)"
-        >
-          <span class="gc-group-avatar">{{ (group.name || '群').slice(0, 1) }}</span>
-          <span class="gc-group-copy">
-            <strong>{{ group.name }}</strong>
-            <small>{{ groupModelSummary(group) }}</small>
-          </span>
-          <span class="status-dot" :class="{ ready: !group.requires_credentials }"></span>
-        </button>
+        <div v-for="group in groupWorkflows" :key="group.workflow_id" class="gc-group-wrap">
+          <button
+            type="button"
+            class="gc-group"
+            :class="{ selected: group.workflow_id === selectedId }"
+            @click="selectWorkflow(group.workflow_id)"
+          >
+            <span class="gc-group-avatar">{{ (group.name || '群').slice(0, 1) }}</span>
+            <span class="gc-group-copy">
+              <strong>{{ group.name }}</strong>
+              <small>{{ groupModelSummary(group) }}</small>
+            </span>
+            <span class="status-dot" :class="{ ready: !group.requires_credentials }"></span>
+          </button>
+          <button
+            class="gc-group-delete"
+            type="button"
+            :disabled="deletingGroupId === group.workflow_id"
+            :aria-label="`删除群聊 ${group.name}`"
+            title="删除群聊"
+            @click.stop="deleteGroup(group)"
+          >
+            <AppIcon name="trash" :size="13" />
+          </button>
+        </div>
         <p v-if="!groupWorkflows.length" class="gc-empty">还没有群聊工作流。</p>
       </aside>
 
@@ -159,6 +169,7 @@ const activeModel = ref('')
 const error = ref('')
 const scrollBox = ref(null)
 const hasEarlier = ref(false)
+const deletingGroupId = ref('')
 let pollTimer = null
 let requestToken = 0
 
@@ -284,6 +295,42 @@ function startPoll() {
     await loadMessages({ silent: true })
     await syncStatus()
   }, 1200)
+}
+
+async function deleteGroup(group) {
+  if (!group?.workflow_id || deletingGroupId.value) return
+  if (!window.confirm(`确定删除群聊「${group.name || group.workflow_id}」？聊天记录会一起删除。`)) return
+  deletingGroupId.value = group.workflow_id
+  error.value = ''
+  try {
+    const latest = await workflowService.getWorkflowStatus(group.workflow_id)
+    if (['executing', 'running', 'stopping', 'paused'].includes(String(latest?.status).toLowerCase())) {
+      error.value = '群聊正在运行，请停止后再删除。'
+      return
+    }
+    await workflowService.deleteWorkflow(group.workflow_id)
+    await messageService.clearMessages(group.workflow_id).catch(() => null)
+    await workflowStore.loadWorkflows()
+    const wasSelected = selectedId.value === group.workflow_id
+    if (wasSelected) {
+      requestToken += 1
+      selectedId.value = ''
+      rawMessages.value = []
+      hasEarlier.value = false
+      running.value = false
+      statusText.value = 'idle'
+      activeAgent.value = ''
+      activeModel.value = ''
+      clearPoll()
+      const next = groupWorkflows.value[0]
+      if (next) await selectWorkflow(next.workflow_id)
+      else emit('select', '')
+    }
+  } catch (err) {
+    error.value = err?.response?.data?.detail || '删除群聊失败'
+  } finally {
+    deletingGroupId.value = ''
+  }
 }
 
 async function selectWorkflow(workflowId) {
@@ -475,4 +522,10 @@ onBeforeUnmount(clearPoll)
 .gc-internal-details pre { margin: 8px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; color: #666; font: 11px/1.5 ui-monospace, Consolas, monospace; }
 .gc-message.is-lead .gc-internal-details summary, .gc-message.is-lead .gc-internal-details pre { color: #d6d6d6; }
 @keyframes gc-message-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.gc-group-wrap { position: relative; display: flex; }
+.gc-group-wrap .gc-group { flex: 1; min-width: 0; }
+.gc-group-delete { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #999; opacity: 0; cursor: pointer; transition: opacity 160ms ease, background 160ms ease, color 160ms ease; }
+.gc-group-wrap:hover .gc-group-delete, .gc-group-delete:focus-visible { opacity: 1; }
+.gc-group-delete:hover { background: #e8e8e8; color: #191919; }
+.gc-group.selected + .gc-group-delete:hover { background: #fff; }
 </style>

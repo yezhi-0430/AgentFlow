@@ -65,7 +65,14 @@
                 <div v-if="form.llmProvider === 'local'" class="creation-local-note"><AppIcon name="terminal" :size="18" /><p>当前后端尚未支持本地模型，请选择在线模型提供商。</p></div>
 
                 <div v-if="form.pattern === 'group_chat'" class="form-group group-chat-model-settings">
-                  <div class="creation-section-heading group-model-heading"><span class="creation-section-number">03</span><div><h3>群聊模型</h3><p>为每个成员和 Lead 选择模型</p></div></div>
+                  <div class="creation-section-heading group-model-heading"><span class="creation-section-number">03</span><div><h3>群聊模型</h3><p>按特点分类选择模型</p></div></div>
+                  <div class="model-recommendation">
+                    <div>
+                      <strong>推荐主流组合</strong>
+                      <p>Lead：GPT-6.1 Sol · 成员：GPT-6 Luna / Claude Sonnet 5.5 / DeepSeek V4.1 Flash / Qwen3.8 Max Prime</p>
+                    </div>
+                    <button class="btn btn-secondary" type="button" :disabled="creating" @click="applyRecommendedTeam">一键应用</button>
+                  </div>
                   <div class="group-model-grid">
                     <div v-for="(member, index) in form.groupMemberModels" :key="index" class="form-group group-model-row">
                       <label :for="`group-model-${index}`">成员 {{ index + 1 }}</label>
@@ -110,6 +117,7 @@ import AppIcon from './AppIcon.vue'
 import AppSelect from './AppSelect.vue'
 import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, minAgentsForPattern, maxAgentsForPattern, clampAgentCount } from '../utils/workflowOptions'
 import { buildGroupChatConfig } from '../utils/groupChatConfig'
+import { RECOMMENDED_TEAM, modelProfile, sortModelOptions } from '../utils/modelProfiles'
 import { useWorkflowStore } from '../stores/workflow'
 import { modelService } from '../services/models'
 import { workflowService } from '../services/workflow'
@@ -135,36 +143,24 @@ let previousFocus = null
 let previousOverflow = ''
 let disposed = false
 
-const MODEL_NOTES = {
-  'openai/gpt-6.1-sol': '旗舰综合 · 1.05M 上下文 · 适合 Lead/复杂规划',
-  'openai/gpt-6-luna': '低成本高吞吐 · 1.05M · 适合大量成员发言',
-  'anthropic/claude-sonnet-5.5': '推理/代码均衡 · 1M · 适合评审与实现',
-  'anthropic/claude-opus-5.5': '深度推理/长文写作 · 1M · 质量优先',
-  'google/gemini-4-argon': '原生多模态 · 1M · 图像/音频/搜索',
-  'deepseek/deepseek-v4.1-flash-1017': '极低成本高速度 · 1M · 适合并行成员',
-  'qwen/qwen3.8-max-prime': '中文/多语言强 · 1M · 适合产品讨论',
-  'x-ai/grok-4.7': '实时风格/搜索增强 · 500K · 观点碰撞',
-  'mistralai/mistral-large-4-0': '推理效率高 · 1M · 结构化输出',
-  'moonshotai/kimi-k3.1-pro': '中文长文档 · 1M · 资料整理',
-  'minimax/minimax-m3.1-flash': '低价快速 · 1M · 草稿/多轮',
-  'z-ai/glm-5.3-prime': '中文 Agent/代码 · 1M · 工具协作',
-  'cohere/command-a-plus': '企业 RAG/检索 · 192K · 知识库问答',
-  'xiaomi/mimo-v2.6-pro': '高性价比中文 · 1.05M · 成本敏感',
-  'meta/muse-wonder': '创意/多模态 · 1M · 头脑风暴',
-  'nvidia/nemotron-3.5-super-vl': '开源多模态 · 1M · 视觉资料',
-}
 const availableModels = computed(() => modelOptions[form.value.llmProvider] || [])
 const groupModelOptions = computed(() => {
   if (modelCatalog.value.length) {
-    return modelCatalog.value
+    const options = modelCatalog.value
       .filter(model => !model.id.includes(':batch') && !model.id.includes(':free') && !model.id.startsWith('~'))
       .map(model => {
-        const context = model.context_length ? `${Math.round(model.context_length / 1000)}K` : ''
-        const baseId = model.id.split(':')[0]
-        const note = MODEL_NOTES[model.id] || MODEL_NOTES[baseId]
-        const detail = note || `通用对话模型 · ${context || '未知'} 上下文${model.supports_tools ? ' · 支持工具调用' : ''}`
-        return { value: model.id, label: model.name, description: detail }
+        const profile = modelProfile(model.id)
+        const context = model.context_length ? `${Math.round(model.context_length / 1000)}K` : '未知'
+        const note = profile.note || `通用对话模型 · ${context} 上下文${model.supports_tools ? ' · 支持工具调用' : ''}`
+        return {
+          value: model.id,
+          label: model.name,
+          description: note,
+          group: profile.category,
+          tag: profile.recommended ? '推荐' : '',
+        }
       })
+    return sortModelOptions(options)
   }
   return modelOptions.openrouter || []
 })
@@ -208,6 +204,21 @@ function syncGroupModels() {
   })
   if (!valid.has(form.value.leadModel)) form.value.leadModel = fallback
   if (form.value.leadCustomModel == null) form.value.leadCustomModel = ''
+}
+
+function applyRecommendedTeam() {
+  if (form.value.pattern !== 'group_chat') return
+  const options = groupModelOptions.value
+  const valid = new Set(options.map(option => option.value))
+  const fallback = options[0]?.value || 'openai/gpt-6.1-sol'
+  const memberIds = RECOMMENDED_TEAM.members.filter(id => valid.has(id))
+  form.value.leadModel = valid.has(RECOMMENDED_TEAM.lead) ? RECOMMENDED_TEAM.lead : fallback
+  form.value.leadCustomModel = ''
+  form.value.groupMemberModels = form.value.groupMemberModels.map((member, index) => ({
+    ...member,
+    model: memberIds[index % Math.max(1, memberIds.length)] || fallback,
+    customModel: '',
+  }))
 }
 
 async function loadModelCatalog() {
@@ -303,6 +314,10 @@ onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.sty
 </script>
 
 <style scoped>
+.model-recommendation { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin: 4px 0 2px; padding: 11px 12px; border: 1px solid #e5e5e5; border-radius: 8px; background: #fafafa; }
+.model-recommendation strong { display: block; color: #191919; font-size: 12px; }
+.model-recommendation p { margin: 3px 0 0; color: #777; font-size: 11px; line-height: 1.5; }
+.model-recommendation .btn { flex-shrink: 0; font-size: 11px; padding: 5px 9px; }
 .group-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
 .group-model-row { margin: 0; }
 .group-member-name { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 7px 8px; border: 1px solid #d9e2e1; border-radius: 7px; font: inherit; }
