@@ -149,6 +149,24 @@ async def test_group_chat_messages_are_persisted_for_replay():
 
 
 @pytest.mark.asyncio
+async def test_group_chat_invalid_lead_json_falls_back_to_original_task():
+    lead = ScriptedAgent("lead", AgentRole.COORDINATOR, [
+        "我先安排一下大家发言",
+        '{"done": true, "summary": "总结"}',
+    ])
+    member = ScriptedAgent("member_1", AgentRole.WORKER, ["处理原始任务"])
+    executor = build_executor([lead, member], max_iterations=2)
+
+    result = await executor.execute("原始任务：解释 list 与 tuple")
+
+    assert result["status"] == "partial"
+    run = executor.get_run(result["run_id"])
+    member_step = next(step for step in run.step_results if step.agent_name == "member_1")
+    assert "请直接完成原始任务" in (member_step.input_text or "")
+    assert "list 与 tuple" in (member_step.input_text or "")
+
+
+@pytest.mark.asyncio
 async def test_group_chat_requires_at_least_two_agents():
     only = ScriptedAgent("member_1", AgentRole.WORKER, ["x"])
     executor = build_executor([only])

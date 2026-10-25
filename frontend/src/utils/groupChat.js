@@ -7,7 +7,10 @@ export function isGroupChatTerminal(status) {
 
 export function formatGroupChatMessage(message) {
   if (!message || typeof message !== 'object') return null
-  const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? '')
+  const display = message.metadata && typeof message.metadata.display_content === 'string'
+    ? message.metadata.display_content
+    : null
+  const content = display || (typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? ''))
   if (!content.trim()) return null
   const sender = message.sender || 'system'
   const receiver = message.receiver || 'group'

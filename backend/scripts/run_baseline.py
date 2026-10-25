@@ -477,38 +477,36 @@ def build_mechanism_checks(
             )
         )
 
-    # 9) 引擎拒绝未支持模式（实验配置不得误用）
+    # 9) 引擎支持全部模式，并拒绝未知模式（实验配置不得误用）
     try:
         from agentflow.core.workflow import (
+            SUPPORTED_PATTERNS,
             UnsupportedPatternError,
-            WorkflowConfig,
-            WorkflowExecutor,
             WorkflowPattern,
+            ensure_supported_pattern,
         )
 
+        supported = all(
+            ensure_supported_pattern(pattern) is None for pattern in WorkflowPattern
+        )
         rejected = False
         try:
-            WorkflowExecutor(
-                WorkflowConfig(
-                    name="unsupported-pattern-check",
-                    pattern=WorkflowPattern.DEBATE,
-                    steps=[],
-                    agents=[],
-                ),
-                enable_persistence=False,
-            )
+            ensure_supported_pattern("unknown-pattern")
         except UnsupportedPatternError:
             rejected = True
         checks.append(
             _check(
-                "引擎拒绝未支持的工作流模式（如 debate）",
-                rejected,
-                {"checked_pattern": "debate", "rejected": rejected},
+                "引擎支持全部 7 种模式且拒绝未知模式",
+                supported and rejected,
+                {
+                    "patterns": list(SUPPORTED_PATTERNS),
+                    "unknown_rejected": rejected,
+                },
             )
         )
     except Exception as exc:
         checks.append(
-            _check("引擎拒绝未支持的工作流模式（如 debate）", False, exp.scrub_secrets(exc))
+            _check("引擎支持全部 7 种模式且拒绝未知模式", False, exp.scrub_secrets(exc))
         )
 
     return {

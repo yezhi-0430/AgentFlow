@@ -1019,12 +1019,16 @@ class WorkflowExecutor:
             input_text=self._record_text(input_text),
             started_at=time.time(),
         )
+        metadata = {"step_id": step.id, "step_index": index, "run_id": run.run_id}
+        if message_content is not None:
+            # 完整 prompt 仍交给模型；短文案只用于聊天时间线展示
+            metadata["display_content"] = message_content
         message = Message(
             sender=sender,
             receiver=receiver or step.agent_name,
-            content=message_content if message_content is not None else input_text,
+            content=input_text,
             message_type=MessageType.TASK,
-            metadata={"step_id": step.id, "step_index": index, "run_id": run.run_id},
+            metadata=metadata,
         )
         step_result.input_message_id = message.id
         self.message_history.append(message)
@@ -1505,11 +1509,13 @@ class WorkflowExecutor:
                 if run.should_stop():
                     break
                 plan_input = (
-                    f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
+                    f"[原始任务] {task}\n\n[群聊记录]\n{transcript_text()}\n\n"
                     f"[Lead 指令] 你是 {lead_name}。请决定下一步：只输出 JSON，不要输出其他文字。"
                     "格式：{\"done\": false, \"next\": \"成员名\", \"task\": \"给该成员的具体子任务\"}；"
                     "如果已经可以结束，输出 {\"done\": true, \"summary\": \"最终总结\"}。"
-                    f"可用成员：{', '.join(member_names)}。"
+                    f"next 只能是以下成员之一：{', '.join(member_names)}；"
+                    "task 必须直接服务于原始任务，禁止编造不存在的成员或无关项目；"
+                    "如果原始任务很明确，请让子任务直接推进它（例如解释 list/tuple），不要泛泛讨论项目。"
                 )
                 plan = await self._execute_recorded_step(
                     step=WorkflowStep(id=f"lead_plan_{turn}", agent_name=lead_name),
@@ -1535,7 +1541,8 @@ class WorkflowExecutor:
                 else:
                     plan_errors += 1
                     next_name = ""
-                    subtask = plan["content"] or "继续推进任务"
+                    # Lead 没按 JSON 返回时，绝不把它的闲聊当成子任务，回退到原始任务
+                    subtask = f"请直接完成原始任务：{task}"
                 if next_name not in member_names:
                     if next_name:
                         plan_errors += 1
@@ -1547,7 +1554,9 @@ class WorkflowExecutor:
                     break
                 member_input = (
                     f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
-                    f"[Lead 指派] {subtask}\n请作为 {next_name} 回应并推进任务。"
+                    f"[Lead 指派] {subtask}\n请作为 {next_name} 回应并推进原始任务；"
+                    "只围绕原始任务作答，不要编造无关的项目背景或成员；"
+                    "如果 Lead 的子任务与原始任务无关，请忽略它，直接完成原始任务。"
                 )
                 reply = await self._execute_recorded_step(
                     step=WorkflowStep(id=f"turn_{turn}_{next_name}", agent_name=next_name),

@@ -229,8 +229,11 @@ def _build_pattern_agents(
         if group_chat_lead:
             agents.append(agent(
                 "lead", AgentRole.COORDINATOR,
-                "You are the lead of a group chat. Decide who speaks next, assign focused subtasks, "
-                "keep the discussion on track, and produce the final summary.",
+                "You are the lead of a group chat. The user's ORIGINAL TASK is the only goal; "
+                "never invent projects, people, or unrelated topics. You MUST reply with a single "
+                "JSON object only, no prose: {\"done\": false, \"next\": \"member_1\", \"task\": \"...\"} "
+                "to assign the next member (next must be from the provided member list), or "
+                "{\"done\": true, \"summary\": \"...\"} to finish. Produce the final summary.",
             ))
             for index in range(agent_count - 1):
                 name = f"member_{index + 1}"

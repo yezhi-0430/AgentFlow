@@ -34,3 +34,13 @@ test('群聊系统消息不标记为 Agent 发言', () => {
   assert.equal(formatGroupChatMessage({ sender: 'group', receiver: 'lead', content: '请开始' }).isAgent, false)
   assert.equal(formatGroupChatMessage({ sender: 'system', receiver: 'lead', content: '系统' }).isAgent, false)
 })
+
+test('群聊时间线优先使用 display_content 展示短文案', () => {
+  const message = formatGroupChatMessage({
+    sender: 'lead',
+    receiver: 'group',
+    content: '完整 prompt（包含 task、transcript、JSON 约束）',
+    metadata: { display_content: '[系统] 请 Lead 决定下一位发言者与子任务' },
+  })
+  assert.equal(message.content, '[系统] 请 Lead 决定下一位发言者与子任务')
+})
