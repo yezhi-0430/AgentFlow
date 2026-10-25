@@ -28,7 +28,7 @@ class ScriptedAgent:
         })
 
 
-def build_executor(agents, max_iterations=12):
+def build_executor(agents, max_iterations=12, *, persist=False):
     config = WorkflowConfig(
         name="group-chat-test",
         pattern=WorkflowPattern.GROUP_CHAT,
@@ -36,7 +36,9 @@ def build_executor(agents, max_iterations=12):
         agents=[agent.config for agent in agents],
         max_iterations=max_iterations,
     )
-    executor = WorkflowExecutor(config, enable_persistence=False, enable_tracing=False)
+    executor = WorkflowExecutor(
+        config, enable_persistence=persist, enable_tracing=False
+    )
     for agent in agents:
         executor.register_agent(agent)
     return executor
@@ -124,6 +126,26 @@ async def test_group_chat_structured_handoff_routes_and_carries_task():
     assert [row[0] for row in result["result"]["transcript"]] == ["member_1", "member_3"]
     run = executor.get_run(result["run_id"])
     assert "请补充风险部分" in (run.step_results[-1].input_text or "")
+
+
+@pytest.mark.asyncio
+async def test_group_chat_messages_are_persisted_for_replay():
+    lead = ScriptedAgent("lead", AgentRole.COORDINATOR, [
+        '{"done": false, "next": "member_1", "task": "先分析"}',
+        '{"done": true, "summary": "总结"}',
+    ])
+    member = ScriptedAgent("member_1", AgentRole.WORKER, ["成员回复"])
+    executor = build_executor([lead, member], max_iterations=2, persist=True)
+
+    result = await executor.execute("task")
+
+    from agentflow.storage import MessageRepository, get_db
+
+    with get_db() as db:
+        rows = MessageRepository.list_by_run(db, result["run_id"])
+    assert rows
+    assert {row["sender"] for row in rows} >= {"lead", "member_1"}
+    assert all("workflow_id" in row and "content" in row for row in rows)
 
 
 @pytest.mark.asyncio

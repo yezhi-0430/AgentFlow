@@ -194,3 +194,24 @@ class ExperimentCandidateModel(Base):
     def __repr__(self):
         return f"<ExperimentCandidate {self.candidate_id} fp={self.fingerprint[:8]}>"
 
+
+class WorkflowMessageModel(Base):
+    """群聊消息持久化（按 run 回放；不保存密钥）"""
+
+    __tablename__ = "workflow_messages"
+
+    id = Column(String(64), primary_key=True)
+    workflow_id = Column(String(64), nullable=False, index=True)
+    run_id = Column(String(64), nullable=True, index=True)
+    sender = Column(String(100), nullable=False)
+    receiver = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
+    message_type = Column(String(32), nullable=False, default="task")
+    meta_json = Column(JSON, nullable=True)
+    timestamp = Column(Float, nullable=False)
+    parent_id = Column(String(64), nullable=True)
+    created_at = Column(Float, nullable=False)
+
+    def __repr__(self):
+        return f"<WorkflowMessage {self.id} {self.sender}->{self.receiver}>"
+

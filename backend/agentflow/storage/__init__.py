@@ -9,11 +9,13 @@ from agentflow.storage.models import (
     StepResultModel,
     UsageTypeEnum,
     WorkflowDefinitionModel,
+    WorkflowMessageModel,
     WorkflowRunModel,
 )
 from agentflow.storage.database import engine, init_db, get_db, get_db_session
 from agentflow.storage.repository import (
     ExperimentRepository,
+    MessageRepository,
     RunRepository,
     WorkflowDefinitionRepository,
 )
@@ -25,6 +27,7 @@ __all__ = [
     "WorkflowDefinitionModel",
     "ExperimentModel",
     "ExperimentCandidateModel",
+    "WorkflowMessageModel",
     "RunStatusEnum",
     "UsageTypeEnum",
     "engine",
@@ -34,4 +37,5 @@ __all__ = [
     "RunRepository",
     "WorkflowDefinitionRepository",
     "ExperimentRepository",
+    "MessageRepository",
 ]

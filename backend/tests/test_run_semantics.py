@@ -598,6 +598,23 @@ def test_api_executes_all_seven_patterns(api_client):
         assert status["pattern"] == pattern
 
 
+def test_group_chat_messages_survive_memory_clear(api_client):
+    from agentflow.api.routes import workflow as workflow_routes
+
+    workflow_id = _create_api_workflow(api_client, pattern="group_chat", agent_count=2,
+                                       name="group-chat-persist")
+    response = api_client.post(f"/api/workflows/{workflow_id}/execute", json={"task": "api task"})
+    assert response.status_code == 200, response.text
+
+    executor = workflow_routes.workflows[workflow_id]
+    executor.message_history.clear()
+
+    replay = api_client.get("/api/messages", params={"workflow_id": workflow_id})
+    assert replay.status_code == 200
+    assert replay.json()["count"] > 0
+    assert {message["sender"] for message in replay.json()["messages"]} >= {"lead", "member_1"}
+
+
 def test_group_chat_lead_can_be_disabled(api_client):
     with_lead = api_client.post("/api/workflows", json={
         "name": "group-with-lead",

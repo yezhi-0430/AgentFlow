@@ -27,7 +27,7 @@ from agentflow.core.redaction import redact_text
 from agentflow.core.run import WorkflowRun, StepResult, RunStatus, UsageType
 
 try:
-    from agentflow.storage import get_db, RunRepository
+    from agentflow.storage import MessageRepository, get_db, RunRepository
     STORAGE_AVAILABLE = True
 except ImportError:
     STORAGE_AVAILABLE = False
@@ -394,6 +394,22 @@ class WorkflowExecutor:
             await asyncio.to_thread(self._persist_sync, run)
         except Exception as e:  # noqa: BLE001
             print(f"Failed to persist run {run.run_id}: {e}")
+
+    async def _persist_group_message(self, message: Message, run: WorkflowRun) -> None:
+        """群聊消息落库（失败不影响执行）；其他模式不写消息表。"""
+        if not self.enable_persistence or not STORAGE_AVAILABLE:
+            return
+
+        def _write() -> None:
+            with get_db() as db:
+                MessageRepository.save(
+                    db, message, workflow_id=self.workflow_id, run_id=run.run_id
+                )
+
+        try:
+            await asyncio.to_thread(_write)
+        except Exception as e:  # noqa: BLE001
+            print(f"Failed to persist group message {message.id}: {e}")
 
     # ---------------------------------------------------------------- execute
     async def execute(
@@ -1012,6 +1028,8 @@ class WorkflowExecutor:
         )
         step_result.input_message_id = message.id
         self.message_history.append(message)
+        if self.config.pattern == WorkflowPattern.GROUP_CHAT:
+            await self._persist_group_message(message, run)
 
         await self._emit("step_started", {
             "workflow_id": self.workflow_id,
@@ -1054,6 +1072,8 @@ class WorkflowExecutor:
             step_result.model = model
             step_result.finish_reason = finish_reason
             self.message_history.append(response)
+            if self.config.pattern == WorkflowPattern.GROUP_CHAT:
+                await self._persist_group_message(response, run)
 
         if outcome["cancelled"]:
             step_result.status = RunStatus.CANCELLED

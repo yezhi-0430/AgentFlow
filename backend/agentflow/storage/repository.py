@@ -26,6 +26,7 @@ from agentflow.storage.models import (
     StepResultModel,
     UsageTypeEnum,
     WorkflowDefinitionModel,
+    WorkflowMessageModel,
     WorkflowRunModel,
 )
 
@@ -519,3 +520,74 @@ class ExperimentRepository:
             .order_by(ExperimentCandidateModel.created_at)
             .all()
         )
+
+
+class MessageRepository:
+    """群聊消息持久化：按 run / workflow 回放，写入前脱敏。"""
+
+    @staticmethod
+    @_serialized_write
+    def save(db: Session, message: Any, *, workflow_id: str, run_id: Optional[str] = None) -> bool:
+        from agentflow.core.redaction import redact_text
+
+        message_id = str(getattr(message, "id", "") or "")
+        if not message_id:
+            return False
+        if db.query(WorkflowMessageModel).filter_by(id=message_id).first():
+            return False
+        message_type = getattr(message, "message_type", "task")
+        message_type = getattr(message_type, "value", message_type)
+        model = WorkflowMessageModel(
+            id=message_id,
+            workflow_id=workflow_id,
+            run_id=run_id,
+            sender=str(getattr(message, "sender", "") or ""),
+            receiver=str(getattr(message, "receiver", "") or ""),
+            content=redact_text(str(getattr(message, "content", "") or ""), limit=20_000),
+            message_type=str(message_type or "task"),
+            meta_json=getattr(message, "metadata", None) or {},
+            timestamp=float(getattr(message, "timestamp", None) or time.time()),
+            parent_id=getattr(message, "parent_id", None),
+            created_at=time.time(),
+        )
+        db.add(model)
+        db.commit()
+        return True
+
+    @staticmethod
+    def list_by_run(db: Session, run_id: str) -> List[Dict[str, Any]]:
+        rows = (
+            db.query(WorkflowMessageModel)
+            .filter_by(run_id=run_id)
+            .order_by(asc(WorkflowMessageModel.timestamp))
+            .all()
+        )
+        return [MessageRepository._to_dict(row) for row in rows]
+
+    @staticmethod
+    def list_by_workflow(
+        db: Session, workflow_id: str, limit: int = 500
+    ) -> List[Dict[str, Any]]:
+        rows = (
+            db.query(WorkflowMessageModel)
+            .filter_by(workflow_id=workflow_id)
+            .order_by(asc(WorkflowMessageModel.timestamp))
+            .limit(max(1, min(limit, 2000)))
+            .all()
+        )
+        return [MessageRepository._to_dict(row) for row in rows]
+
+    @staticmethod
+    def _to_dict(row: WorkflowMessageModel) -> Dict[str, Any]:
+        return {
+            "id": row.id,
+            "sender": row.sender,
+            "receiver": row.receiver,
+            "content": row.content,
+            "message_type": row.message_type,
+            "metadata": row.meta_json or {},
+            "timestamp": row.timestamp,
+            "parent_id": row.parent_id,
+            "workflow_id": row.workflow_id,
+            "run_id": row.run_id,
+        }

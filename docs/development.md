@@ -93,7 +93,8 @@ npm run dev -- --host 127.0.0.1 --strictPort
 - 创建 API 会对数量越界/低于最低值的请求返回 400；定义导入同样校验。
 - 新增模式复用 `_execute_recorded_step`：步骤记录、超时/重试、停止、token、trace_id 与现有记录格式一致。
 - 动态协调者输出非法 JSON 时回退到第一位 worker，并把运行标记为 partial；群聊 Lead 同样有回退。
-- 群聊不递归创建子 Agent，也不做工具调用；成员通过 `@name` 或 JSON `{"handoff":"member_2","task":"..."}` 影响下一位发言者（无 Lead 模式），有 Lead 时由 Lead 决定。
+- 群聊成员通过 `@name` 或 JSON `{"handoff":"member_2","task":"..."}` 影响下一位发言者（无 Lead 模式）；有 Lead 时由 Lead 决定。
+- 群聊消息写入 `workflow_messages` 表（写入前脱敏），按 workflow/run 回放；服务重启后独立群聊面板仍能加载历史。
 - 实验脚本的固定配置仍只使用 sequential/parallel，尚未把这些新模式纳入评测数据集。
 
 ### Harness²-lite（实验对比）

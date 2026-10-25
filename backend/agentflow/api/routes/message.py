@@ -15,6 +15,12 @@ async def get_messages(
     """获取消息历史（只读内存；历史回看不触发模型调用）"""
     from agentflow.api.routes.workflow import workflows
 
+    try:
+        from agentflow.storage import MessageRepository, get_db
+    except ImportError:  # pragma: no cover - 存储不可用时只读内存
+        MessageRepository = None
+        get_db = None
+
     if run_id:
         # 按运行过滤：优先从执行器内存中取该 run 的消息
         for wf_id, executor in workflows.items():
@@ -27,19 +33,45 @@ async def get_messages(
                     item["run_id"] = run_id
                     payload.append(item)
                 return {"workflow_id": wf_id, "run_id": run_id, "messages": payload, "count": len(payload)}
+        # 服务重启后内存消息丢失：从 group messages 表回放
+        if MessageRepository is not None and get_db is not None:
+            with get_db() as db:
+                rows = MessageRepository.list_by_run(db, run_id)
+            if rows:
+                return {
+                    "workflow_id": rows[0].get("workflow_id"),
+                    "run_id": run_id,
+                    "messages": rows,
+                    "count": len(rows),
+                }
         raise HTTPException(status_code=404, detail="Run messages not found")
 
     if workflow_id:
-        # 获取特定工作流的消息（当前/最近一次运行）
+        # 获取特定工作流的消息（当前/最近一次运行；重启后从 DB 回放）
         if workflow_id not in workflows:
+            if MessageRepository is not None and get_db is not None:
+                with get_db() as db:
+                    rows = MessageRepository.list_by_workflow(db, workflow_id)
+                if rows:
+                    return {
+                        "workflow_id": workflow_id,
+                        "run_id": rows[-1].get("run_id"),
+                        "messages": rows,
+                        "count": len(rows),
+                    }
             raise HTTPException(status_code=404, detail="Workflow not found")
 
         executor = workflows[workflow_id]
         messages = [msg.to_dict() for msg in executor.message_history]
+        if not messages and MessageRepository is not None and get_db is not None:
+            with get_db() as db:
+                messages = MessageRepository.list_by_workflow(db, workflow_id)
 
         return {
             "workflow_id": workflow_id,
-            "run_id": executor.current_run.run_id if executor.current_run else None,
+            "run_id": executor.current_run.run_id if executor.current_run else (
+                messages[-1].get("run_id") if messages else None
+            ),
             "messages": messages,
             "count": len(messages),
         }
