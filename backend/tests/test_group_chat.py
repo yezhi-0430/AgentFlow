@@ -167,6 +167,28 @@ async def test_group_chat_invalid_lead_json_falls_back_to_original_task():
 
 
 @pytest.mark.asyncio
+async def test_group_chat_tool_ask_agent_returns_result_to_caller():
+    first = ScriptedAgent("member_1", AgentRole.WORKER, [
+        '{"tool": "ask_agent", "agent": "member_2", "task": "请核对事实"}',
+        "综合答案",
+    ])
+    second = ScriptedAgent("member_2", AgentRole.WORKER, ["核对后的结果"])
+    executor = build_executor([first, second], max_iterations=2)
+
+    result = await executor.execute("task")
+
+    assert result["status"] == "completed"
+    speakers = [row[0] for row in result["result"]["transcript"]]
+    assert "member_2" in speakers
+    assert speakers[-1] == "member_1"
+    run = executor.get_run(result["run_id"])
+    tool_step = next(step for step in run.step_results if step.agent_name == "member_2")
+    assert "请核对事实" in (tool_step.input_text or "")
+    followup = run.step_results[-1]
+    assert followup.agent_name == "member_1" and "工具结果" in (followup.input_text or "")
+
+
+@pytest.mark.asyncio
 async def test_group_chat_requires_at_least_two_agents():
     only = ScriptedAgent("member_1", AgentRole.WORKER, ["x"])
     executor = build_executor([only])

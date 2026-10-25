@@ -63,6 +63,7 @@ MAX_AGENTS_BY_PATTERN = {
     "group_chat": 6,
 }
 MAX_RUNS_IN_MEMORY = 50
+MAX_GROUP_TOOL_CALLS = 3
 PARALLEL_STOP_POLL_INTERVAL = 0.05
 TERMINAL_STATUSES = {
     RunStatus.COMPLETED,
@@ -1466,6 +1467,82 @@ class WorkflowExecutor:
         }
 
     # -------------------------------------------------------------- group chat
+    def _parse_group_tool(self, content: str) -> Optional[Dict[str, str]]:
+        """解析执行器中介的工具调用：ask_agent / handoff_to。"""
+        payload = self._parse_dynamic_plan(content)
+        if not payload:
+            return None
+        tool = str(payload.get("tool") or "").strip().lower()
+        if tool not in ("ask_agent", "handoff_to"):
+            return None
+        target = str(payload.get("agent") or payload.get("target") or "").strip()
+        task = str(payload.get("task") or payload.get("question") or "").strip()
+        if not target or not task:
+            return None
+        return {"tool": tool, "agent": target, "task": task}
+
+    async def _execute_group_tool(
+        self,
+        *,
+        caller_name: str,
+        content: str,
+        task: str,
+        member_names: List[str],
+        transcript: List[Tuple[str, str]],
+        run: WorkflowRun,
+        trace,
+        index: int,
+        tool_calls: int,
+    ) -> Tuple[bool, int, int, bool]:
+        """执行 Agent 发起的 ask_agent / handoff_to；返回 (handled, index, calls, ok)。"""
+        directive = self._parse_group_tool(content)
+        if not directive:
+            return False, index, tool_calls, True
+        if tool_calls >= MAX_GROUP_TOOL_CALLS:
+            return True, index, tool_calls, False
+        target = directive["agent"]
+        if target not in member_names:
+            return True, index, tool_calls, False
+        agent = self.agents.get(target)
+        if agent is None:
+            return True, index, tool_calls, False
+
+        recent = "\n\n".join(f"[{speaker}] {text}" for speaker, text in transcript[-16:]) or "（尚无发言）"
+        tool_prompt = (
+            f"{task}\n\n[群聊记录]\n{recent}\n\n"
+            f"[工具调用 ask_agent] {caller_name} 请求你（{target}）处理：{directive['task']}\n"
+            "请直接完成这个请求，并把结果清楚地返回给调用者。"
+        )
+        tool_result = await self._execute_recorded_step(
+            step=WorkflowStep(id=f"tool_{tool_calls + 1}_{caller_name}_{target}", agent_name=target),
+            agent=agent, input_text=tool_prompt, run=run, trace=trace, index=index,
+            sender=caller_name, receiver=target, response_receiver=caller_name,
+            message_content=f"[工具] {caller_name} → {target}: {directive['task']}",
+        )
+        index += 1
+        tool_calls += 1
+        if not tool_result["ok"]:
+            return True, index, tool_calls, False
+        transcript.append((target, tool_result["content"] or ""))
+
+        if directive["tool"] == "ask_agent":
+            follow_prompt = (
+                f"{task}\n\n[群聊记录]\n"
+                + "\n\n".join(f"[{speaker}] {text}" for speaker, text in transcript[-16:])
+                + f"\n\n[工具结果] {target} 已返回结果。请作为 {caller_name} 基于该结果给出最终回答。"
+            )
+            follow = await self._execute_recorded_step(
+                step=WorkflowStep(id=f"tool_followup_{tool_calls}_{caller_name}", agent_name=caller_name),
+                agent=self.agents[caller_name], input_text=follow_prompt, run=run, trace=trace, index=index,
+                sender=target, receiver=caller_name, response_receiver="group",
+                message_content="基于工具结果给出最终回答",
+            )
+            index += 1
+            if not follow["ok"]:
+                return True, index, tool_calls, False
+            transcript.append((caller_name, follow["content"] or ""))
+        return True, index, tool_calls, True
+
     async def _execute_group_chat(self, task: str, run: WorkflowRun, trace=None) -> Dict[str, Any]:
         """受控 Agent 群聊：Lead 可选；共享 transcript；最多 max_iterations 轮。
 
@@ -1491,6 +1568,7 @@ class WorkflowExecutor:
         index = 0
         had_failure = False
         plan_errors = 0
+        tool_calls = 0
 
         def transcript_text(limit: int = 16) -> str:
             recent = transcript[-limit:]
@@ -1557,6 +1635,8 @@ class WorkflowExecutor:
                     f"[Lead 指派] {subtask}\n请作为 {next_name} 回应并推进原始任务；"
                     "只围绕原始任务作答，不要编造无关的项目背景或成员；"
                     "如果 Lead 的子任务与原始任务无关，请忽略它，直接完成原始任务。"
+                    f"如需另一位成员协助，可只输出 JSON：{{\"tool\": \"ask_agent\", "
+                    f"\"agent\": \"成员名\", \"task\": \"...\"}}；可用成员：{', '.join(member_names)}。"
                 )
                 reply = await self._execute_recorded_step(
                     step=WorkflowStep(id=f"turn_{turn}_{next_name}", agent_name=next_name),
@@ -1567,6 +1647,16 @@ class WorkflowExecutor:
                 index += 1
                 if reply["ok"]:
                     remember(next_name, reply["content"] or "")
+                    handled, index, tool_calls, tool_ok = await self._execute_group_tool(
+                        caller_name=next_name, content=reply["content"] or "", task=task,
+                        member_names=member_names, transcript=transcript,
+                        run=run, trace=trace, index=index, tool_calls=tool_calls,
+                    )
+                    if handled:
+                        if not tool_ok:
+                            had_failure = True
+                            break
+                        continue
                 elif reply["cancelled"]:
                     break
                 else:
@@ -1620,6 +1710,7 @@ class WorkflowExecutor:
                 f"{task}\n\n[群聊记录]\n{transcript_text()}\n\n"
                 f"[群聊] 你是 {speaker}。请阅读以上讨论，补充观点或推进任务；"
                 "如需点名其他人，可在回复中使用 @成员名。"
+                "如需另一位成员协助，可只输出 JSON：{\"tool\": \"ask_agent\", \"agent\": \"成员名\", \"task\": \"...\"}。"
                 + handoff_note
             )
             outcome = await self._execute_recorded_step(
@@ -1632,6 +1723,16 @@ class WorkflowExecutor:
             if outcome["ok"]:
                 content = outcome["content"] or ""
                 remember(speaker, content)
+                handled, index, tool_calls, tool_ok = await self._execute_group_tool(
+                    caller_name=speaker, content=content, task=task,
+                    member_names=member_names, transcript=transcript,
+                    run=run, trace=trace, index=index, tool_calls=tool_calls,
+                )
+                if handled:
+                    if not tool_ok:
+                        had_failure = True
+                    pending_handoff_task = ""
+                    break
                 pending_handoff_task = ""
                 handoff = self._parse_dynamic_plan(content)
                 handoff_target = str(handoff.get("handoff") or handoff.get("next") or "") if handoff else ""
