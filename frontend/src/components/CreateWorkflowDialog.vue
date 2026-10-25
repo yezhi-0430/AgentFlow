@@ -38,6 +38,17 @@
                 <div v-if="form.pattern === 'group_chat'" class="form-group group-chat-settings">
                   <label class="group-chat-lead"><input v-model="form.enableLead" type="checkbox" :disabled="creating" /> 启用 Lead Agent</label>
                   <p class="hint">开启后由 Lead 规划、分派并总结；关闭后成员轮流发言，可用 @成员名 点名。</p>
+                  <div class="group-model-grid">
+                    <div v-for="(member, index) in form.groupMemberModels" :key="member.name" class="form-group group-model-row">
+                      <label :for="`group-model-${index}`">{{ member.name }} 模型</label>
+                      <AppSelect :id="`group-model-${index}`" v-model="member.model" label="成员模型" :options="groupModelOptions" :disabled="creating" />
+                    </div>
+                    <div v-if="form.enableLead" class="form-group group-model-row">
+                      <label for="group-lead-model">Lead 模型</label>
+                      <AppSelect id="group-lead-model" v-model="form.leadModel" label="Lead 模型" :options="groupModelOptions" :disabled="creating" />
+                    </div>
+                  </div>
+                  <p class="hint">群聊统一使用 OpenRouter；成员与 Lead 可选择不同模型。</p>
                 </div>
               </section>
 
@@ -45,10 +56,10 @@
                 <div class="creation-section-heading"><span class="creation-section-number">02</span><div><h3 id="model-settings-title">模型连接</h3><p>选择团队使用的模型与服务</p></div></div>
                 <div class="form-group">
                   <label for="llmProvider">模型提供商</label>
-                  <AppSelect id="llmProvider" v-model="form.llmProvider" label="模型提供商" :options="providerOptions" :disabled="creating" />
+                  <AppSelect id="llmProvider" v-model="form.llmProvider" label="模型提供商" :options="providerOptions" :disabled="creating || form.pattern === 'group_chat'" />
                 </div>
                 <Transition name="field">
-                  <div v-if="availableModels.length" class="form-group">
+                  <div v-if="availableModels.length && form.pattern !== 'group_chat'" class="form-group">
                     <label for="model">选择模型</label>
                     <AppSelect id="model" v-model="form.model" label="选择模型" :options="availableModels" :disabled="creating" />
                     <p v-if="form.llmProvider === 'openrouter'" class="hint creation-model-hint">模型将通过 OpenRouter 接口调用。</p>
@@ -90,7 +101,9 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import AppIcon from './AppIcon.vue'
 import AppSelect from './AppSelect.vue'
 import { providerOptions, modelOptions, creationPatterns, isSupportedWorkflowPattern, normalizeCreationPattern, minAgentsForPattern, maxAgentsForPattern, clampAgentCount } from '../utils/workflowOptions'
+import { buildGroupChatConfig } from '../utils/groupChatConfig'
 import { useWorkflowStore } from '../stores/workflow'
+import { modelService } from '../services/models'
 import { workflowService } from '../services/workflow'
 import { validateConnection, formatExecutionError } from '../utils/connection.js'
 
@@ -98,9 +111,9 @@ const props = defineProps({ modelValue: Boolean, preset: { type: Object, default
 const emit = defineEmits(['update:modelValue', 'created'])
 const workflowStore = useWorkflowStore()
 const defaults = () => {
-  const provider = props.preset?.llmProvider || 'openai'
+  const provider = pattern === 'group_chat' ? 'openrouter' : (props.preset?.llmProvider || 'openai')
   const pattern = normalizeCreationPattern(props.preset?.pattern)
-  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '' }
+  return { name: '', description: '', ...props.preset, pattern, agentCount: clampAgentCount(pattern, props.preset?.agentCount ?? 3), enableLead: true, llmProvider: provider, apiKey: '', model: modelOptions[provider]?.[0]?.value || '', groupMemberModels: [], leadModel: '' }
 }
 const form = ref(defaults())
 const creating = ref(false)
@@ -108,11 +121,18 @@ const errorMessage = ref('')
 const showApiKey = ref(false)
 const dialog = ref(null)
 const nameInput = ref(null)
+const modelCatalog = ref([])
 let previousFocus = null
 let previousOverflow = ''
 let disposed = false
 
 const availableModels = computed(() => modelOptions[form.value.llmProvider] || [])
+const groupModelOptions = computed(() => {
+  if (modelCatalog.value.length) {
+    return modelCatalog.value.map(model => ({ value: model.id, label: model.name, description: model.id }))
+  }
+  return modelOptions.openrouter || []
+})
 const selectedModel = computed(() => availableModels.value.find(model => model.value === form.value.model))
 const patterns = creationPatterns
 const selectedPattern = computed(() => patterns.find(pattern => pattern.value === form.value.pattern) || patterns[0])
@@ -127,10 +147,47 @@ const countError = computed(() => {
   return ''
 })
 const connectionError = computed(() => validateConnection(form.value.llmProvider, form.value.apiKey))
-const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && selectedModel.value && !connectionError.value))
+const groupModelsValid = computed(() => {
+  if (form.value.pattern !== 'group_chat') return true
+  const members = form.value.groupMemberModels || []
+  if (!members.length || members.some(member => !member.model)) return false
+  return form.value.enableLead ? Boolean(form.value.leadModel) : true
+})
+const isValid = computed(() => Boolean(form.value.name.trim() && isSupportedWorkflowPattern(form.value.pattern) && validCount.value && (form.value.pattern === 'group_chat' ? groupModelsValid.value : selectedModel.value) && !connectionError.value))
+
+function syncGroupModels() {
+  if (form.value.pattern !== 'group_chat') return
+  const count = Math.max(1, form.value.enableLead ? form.value.agentCount - 1 : form.value.agentCount)
+  const options = groupModelOptions.value
+  const fallback = options[0]?.value || 'openai/gpt-4o'
+  const current = [...(form.value.groupMemberModels || [])]
+  form.value.groupMemberModels = Array.from({ length: count }, (_, index) => ({
+    name: `member_${index + 1}`,
+    model: current[index]?.model || fallback,
+  }))
+  if (!form.value.leadModel) form.value.leadModel = fallback
+}
+
+async function loadModelCatalog() {
+  try {
+    const data = await modelService.getOpenRouterModels()
+    modelCatalog.value = data?.models || []
+  } catch {
+    modelCatalog.value = []
+  }
+  syncGroupModels()
+}
 
 watch(() => form.value.llmProvider, provider => { form.value.model = modelOptions[provider]?.[0]?.value || '' })
-watch(() => form.value.pattern, pattern => { form.value.agentCount = clampAgentCount(pattern, form.value.agentCount) })
+watch(() => form.value.pattern, pattern => {
+  form.value.agentCount = clampAgentCount(pattern, form.value.agentCount)
+  if (pattern === 'group_chat') {
+    form.value.llmProvider = 'openrouter'
+    if (!form.value.model) form.value.model = groupModelOptions.value[0]?.value || 'openai/gpt-4o'
+  }
+  syncGroupModels()
+})
+watch(() => [form.value.agentCount, form.value.enableLead], syncGroupModels)
 watch(() => props.modelValue, async open => {
   if (open) {
     previousFocus = document.activeElement
@@ -140,6 +197,8 @@ watch(() => props.modelValue, async open => {
     errorMessage.value = ''
     showApiKey.value = false
     await nextTick()
+    await loadModelCatalog()
+    syncGroupModels()
     nameInput.value?.focus()
   } else {
     document.body.style.overflow = previousOverflow
@@ -170,14 +229,20 @@ async function create() {
       name: form.value.name.trim(), description: form.value.description, pattern: normalizeCreationPattern(form.value.pattern),
       config: {
         agent_count: form.value.agentCount,
-        llm_provider: form.value.llmProvider,
+        llm_provider: form.value.pattern === 'group_chat' ? 'openrouter' : form.value.llmProvider,
         api_key: form.value.apiKey.trim(),
         model: form.value.model || undefined,
-        group_chat: form.value.pattern === 'group_chat' ? { enable_lead: form.value.enableLead } : undefined,
+        group_chat: form.value.pattern === 'group_chat'
+          ? buildGroupChatConfig({
+              enableLead: form.value.enableLead,
+              leadModel: form.value.leadModel,
+              members: form.value.groupMemberModels,
+            })
+          : undefined,
       },
     })
     if (disposed) return
-    workflowStore.setWorkflow({ ...result, llm_provider: form.value.llmProvider })
+    workflowStore.setWorkflow({ ...result, llm_provider: form.value.pattern === 'group_chat' ? 'openrouter' : form.value.llmProvider })
     emit('created', result)
     creating.value = false
     close()
@@ -189,3 +254,9 @@ async function create() {
 }
 onBeforeUnmount(() => { disposed = true; if (props.modelValue) document.body.style.overflow = previousOverflow })
 </script>
+
+<style scoped>
+.group-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.group-model-row { margin: 0; }
+@media (max-width: 720px) { .group-model-grid { grid-template-columns: 1fr; } }
+</style>
