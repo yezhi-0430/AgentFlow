@@ -295,6 +295,7 @@ onMounted(async () => {
   await workflowStore.loadWorkflows()
   if (!selectedId.value) selectedId.value = groupWorkflows.value[0]?.workflow_id || ''
   if (selectedId.value) {
+    emit('select', selectedId.value)
     await loadMessages()
     await syncStatus()
     startPoll()
