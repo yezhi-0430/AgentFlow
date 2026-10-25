@@ -1,5 +1,10 @@
 <template>
-  <div class="app-shell" :class="{ 'is-focused': focusMode, 'is-resizing-timeline': timelineResizing }">
+  <GroupChatPage
+    v-if="groupChatOpen"
+    @close="closeGroupChat"
+    @create="onGroupCreate"
+  />
+  <div v-else class="app-shell" :class="{ 'is-focused': focusMode, 'is-resizing-timeline': timelineResizing }">
     <nav class="navigation-rail" aria-label="工作台导航">
       <button class="sidebar-brand" aria-label="返回工作流画布" @click="canvas?.fit()">
         <span class="brand-mark"><AppIcon name="flow" :size="22" /></span>
@@ -17,7 +22,7 @@
         <AppIcon name="layers" /><span class="nav-label">工作流库</span><span class="nav-count">{{ workflowStore.workflows.length }}</span>
       </button>
       <RunHistoryPanel ref="historyPanel" :workflow-id="workflowStore.currentWorkflow?.workflow_id || null" />
-      <GroupChatPanel ref="groupChatPanel" @create="openCreateWorkflow({ pattern: 'group_chat' })" />
+      <GroupChatPanel @open="openGroupChat" />
       <ExperimentPanel />
       <button class="rail-button sidebar-create" title="创建工作流 · N" aria-label="创建工作流" @click="openCreateWorkflow()">
         <AppIcon name="plus" /><span class="nav-label">新建工作流</span><kbd>N</kbd>
@@ -116,6 +121,7 @@ import CreateWorkflowDialog from './components/CreateWorkflowDialog.vue'
 import WorkflowLibraryDialog from './components/WorkflowLibraryDialog.vue'
 import RunHistoryPanel from './components/RunHistoryPanel.vue'
 import GroupChatPanel from './components/GroupChatPanel.vue'
+import GroupChatPage from './components/GroupChatPage.vue'
 import ExperimentPanel from './components/ExperimentPanel.vue'
 import Toast from './components/Toast.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
@@ -141,9 +147,29 @@ const canvas = ref(null)
 const toast = ref(null)
 const confirm = ref(null)
 const historyPanel = ref(null)
-const groupChatPanel = ref(null)
+const groupChatOpen = ref(window.location.hash.startsWith('#group-chat'))
 const { height: timelineHeight, minHeight: timelineMinHeight, maxHeight: timelineMaxHeight, resizing: timelineResizing, beginResize: beginTimelineResize, moveResize: moveTimelineResize, endResize: endTimelineResize, onResizeKey: onTimelineResizeKey, resetHeight: resetTimelineHeight, fitViewport: fitTimelineViewport } = useTimelineResize()
 const patternName = computed(() => workflowPatternLabels[workflowStore.currentWorkflow?.pattern] || '未设置模式')
+
+function openGroupChat() {
+  groupChatOpen.value = true
+  if (!window.location.hash.startsWith('#group-chat')) {
+    window.history.pushState({ groupChat: true }, '', '#group-chat')
+  }
+}
+function closeGroupChat() {
+  groupChatOpen.value = false
+  if (window.location.hash.startsWith('#group-chat')) {
+    window.history.pushState({}, '', `${window.location.pathname}${window.location.search}`)
+  }
+}
+function onGroupCreate() {
+  closeGroupChat()
+  openCreateWorkflow({ pattern: 'group_chat' })
+}
+function syncGroupChatFromHash() {
+  groupChatOpen.value = window.location.hash.startsWith('#group-chat')
+}
 
 function handleShortcut(event) {
   if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
@@ -208,12 +234,11 @@ function configureConnection(task) {
     llmProvider: workflowStore.executionError.includes('OpenRouter') ? 'openrouter' : workflow?.llm_provider || 'openai',
   })
 }
-function onCreated(workflow) {
+function onCreated() {
   messageStore.clearMessages()
   inspectorOpen.value = false
   workflowStore.refreshExecution()
   workflowStore.loadWorkflows()
-  if (workflow?.pattern === 'group_chat') groupChatPanel.value?.selectWorkflow?.(workflow.workflow_id)
   toast.value?.success('确认下方任务后，点击「开始运行」。', '创建成功')
 }
 function onImported(workflow) {
@@ -253,6 +278,8 @@ function loadDemo() {
 onMounted(() => {
   window.addEventListener('keydown', handleShortcut)
   window.addEventListener('resize', fitTimelineViewport)
+  window.addEventListener('popstate', syncGroupChatFromHash)
+  window.addEventListener('hashchange', syncGroupChatFromHash)
   workflowStore.restoreWorkflow()
   // 同步一次列表，让"工作流库"入口即使当前工作区为空也能看到已保存的定义。
   workflowStore.loadWorkflows()
@@ -260,6 +287,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleShortcut)
   window.removeEventListener('resize', fitTimelineViewport)
+  window.removeEventListener('popstate', syncGroupChatFromHash)
+  window.removeEventListener('hashchange', syncGroupChatFromHash)
   endTimelineResize()
   workflowStore.disposeExecution()
 })

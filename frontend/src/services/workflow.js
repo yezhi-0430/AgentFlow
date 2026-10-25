@@ -101,8 +101,8 @@ export const messageService = {
   /**
    * 获取消息历史
    */
-  async getMessages(workflowId) {
-    return api.get('/api/messages', { params: { workflow_id: workflowId } })
+  async getMessages(workflowId, params = {}) {
+    return api.get('/api/messages', { params: { workflow_id: workflowId, ...params } })
   },
 
   /**
