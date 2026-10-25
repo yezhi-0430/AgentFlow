@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv()
 
-from agentflow.api.routes import workflow, agent, message, runs, experiments
+from agentflow.api.routes import workflow, agent, message, runs, experiments, models
 from agentflow.api.websocket import manager
 
 
@@ -66,6 +66,7 @@ app.include_router(agent.router, prefix="/api/agents", tags=["agents"])
 app.include_router(message.router, prefix="/api/messages", tags=["messages"])
 app.include_router(runs.router, prefix="/api", tags=["runs"])
 app.include_router(experiments.router, prefix="/api", tags=["experiments"])
+app.include_router(models.router, prefix="/api/models", tags=["models"])
 
 
 @app.middleware("http")
